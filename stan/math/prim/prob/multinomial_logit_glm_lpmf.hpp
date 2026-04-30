@@ -70,17 +70,17 @@ inline return_type_t<T_x, T_alpha, T_beta> multinomial_logit_glm_lpmf(
   using T_beta_ref = ref_type_if_not_constant_t<T_beta>;
   constexpr int T_x_rows = T_x::RowsAtCompileTime;
   constexpr int T_alpha_rows = T_alpha::RowsAtCompileTime;
-  // eta is the same K-vector for every instance iff both x and alpha are
-  // broadcast (1 row each); otherwise each instance has a distinct eta_n.
-  constexpr int lin_rows = (T_x_rows == 1 && T_alpha_rows == 1) ? 1 : Dynamic;
-  constexpr bool lin_is_broadcast = (lin_rows == 1);
-  // When x is broadcast but alpha is N×K, the beta/x gradients are
-  // dL/d beta = x^T * sum_n(delta_n) and dL/d x = sum_n(delta_n) * beta^T,
-  // i.e. delta must be summed over instances before the outer product.
-  constexpr bool sum_delta_for_x = (T_x_rows == 1 && !lin_is_broadcast);
+  // η is the same K-vector for every instance iff both x and α are
+  // broadcast (1 row each); otherwise each instance has a distinct η_n.
+  constexpr int eta_rows = (T_x_rows == 1 && T_alpha_rows == 1) ? 1 : Dynamic;
+  constexpr bool eta_is_broadcast = (eta_rows == 1);
+  // When x is broadcast but α is N×K, the β/x gradients are
+  // ∂ℓ/∂β = xᵀ * Σ_n(δ_n) and ∂ℓ/∂x = Σ_n(δ_n) * βᵀ,
+  // i.e. δ must be summed over instances before the outer product.
+  constexpr bool sum_delta_for_x = (T_x_rows == 1 && !eta_is_broadcast);
   constexpr bool gradients_calc = is_any_autodiff_v<T_x, T_alpha, T_beta>;
 
-  // N_instances: derived from x when available, then alpha, then y
+  // N_instances: derived from x when available, then α, then y
   const size_t N_instances = T_x_rows != 1   ? x.rows()
                              : T_alpha_rows != 1 ? alpha.rows()
                                                  : y.size();
@@ -120,42 +120,42 @@ inline return_type_t<T_x, T_alpha, T_beta> multinomial_logit_glm_lpmf(
   const auto& alpha_val = value_of(alpha_ref);
   const auto& beta_val = to_ref_if<is_autodiff_v<T_x>>(value_of(beta_ref));
 
-  // Base linear predictor x*beta before adding the intercept alpha.
+  // Base linear predictor x*β before adding the intercept α.
   const auto x_beta = (x_val * beta_val).eval();
 
-  // eta (lin_rows x K): eta_nk = (x*beta)_nk + alpha_nk.
-  // Shape is 1xK when both x and alpha broadcast, else NxK.
-  const Array<T_partials_return, lin_rows, Dynamic> lin = [&]() {
+  // η (eta_rows × K): η_nk = (x*β)_nk + α_nk.
+  // Shape is 1×K when both x and α broadcast, else N×K.
+  const Array<T_partials_return, eta_rows, Dynamic> eta = [&]() {
     if constexpr (T_alpha_rows == 1) {
-      // Broadcast alpha: eta = x*beta + alpha (alpha added to every row)
+      // Broadcast α: η = x*β + α (α added to every row)
       return (x_beta.rowwise() + alpha_val).array().eval();
     } else if constexpr (T_x_rows == 1) {
-      // Broadcast x: tile x*beta to N rows, then add per-instance alpha
+      // Broadcast x: tile x*β to N rows, then add per-instance α
       return (x_beta.replicate(N_instances, 1) + alpha_val).array().eval();
     } else {
       return (x_beta + alpha_val).array().eval();
     }
   }();
 
-  // Row-wise maximum of eta, used to center the log-sum-exp computation.
-  const Array<T_partials_return, lin_rows, 1> lin_max = lin.rowwise().maxCoeff();
-  // Centered linear predictor: eta_nk - max_k(eta_nk).
-  // Subtracting the row maximum keeps all exponents <= 1 and prevents overflow
+  // Row-wise maximum of η, used to center the log-sum-exp computation.
+  const Array<T_partials_return, eta_rows, 1> eta_max = eta.rowwise().maxCoeff();
+  // Centered linear predictor: η_nk - max_k(η_nk).
+  // Subtracting the row maximum keeps all exponents ≤ 1 and prevents overflow
   // while leaving softmax values unchanged (max cancels in numerator/denominator).
-  const Array<T_partials_return, lin_rows, Dynamic> shifted_lin
-      = lin.colwise() - lin_max;
-  // exp(eta_nk - max_k eta_nk). Materialised only when gradients are needed;
-  // otherwise it is evaluated lazily inside sum_exp_lin and then discarded.
-  auto&& exp_lin = to_ref_if<gradients_calc>(exp(shifted_lin));
-  // Partition function (per row): Z_n = sum_k exp(eta_nk - max_k eta_nk).
-  const Array<T_partials_return, lin_rows, 1> sum_exp_lin
-      = exp_lin.rowwise().sum();
-  // Log category probabilities: log p_nk = eta_nk - log Z_n - max_k eta_nk
-  //                                      = shifted_lin_nk - log(Z_n).
-  const Array<T_partials_return, lin_rows, Dynamic> log_softmax_lin
-      = shifted_lin.colwise() - log(sum_exp_lin);
+  const Array<T_partials_return, eta_rows, Dynamic> shifted_eta
+      = eta.colwise() - eta_max;
+  // exp(η_nk - max_k η_nk). Materialised only when gradients are needed;
+  // otherwise it is evaluated lazily inside sum_exp_η and then discarded.
+  auto&& exp_eta = to_ref_if<gradients_calc>(exp(shifted_eta));
+  // Partition function (per row): Z_n = Σ_k exp(η_nk - max_k η_nk).
+  const Array<T_partials_return, eta_rows, 1> sum_exp_eta
+      = exp_eta.rowwise().sum();
+  // Log category probabilities: log p_nk = η_nk - log Z_n - max_k η_nk
+  //                                      = shifted_η_nk - log(Z_n).
+  const Array<T_partials_return, eta_rows, Dynamic> log_softmax_eta
+      = shifted_eta.colwise() - log(sum_exp_eta);
 
-  // Observed count matrix y_mat (N x K) and per-instance totals S_n = sum_k y_nk.
+  // Observed count matrix y_mat (N×K) and per-instance totals S_n = Σ_k y_nk.
   const Array<double, Dynamic, Dynamic> y_mat
       = Array<double, Dynamic, Dynamic>::NullaryExpr(
           N_instances, N_classes,
@@ -163,21 +163,21 @@ inline return_type_t<T_x, T_alpha, T_beta> multinomial_logit_glm_lpmf(
   // S_n is the sample size of the n-th multinomial draw.
   const Array<double, Dynamic, 1> S = y_mat.rowwise().sum();
 
-  // When eta is broadcast (lin_is_broadcast), all instances share the same
+  // When η is broadcast (eta_is_broadcast), all instances share the same
   // log-probabilities, so the sufficient statistic for the log-likelihood is
-  // y_totals_k = sum_n y_nk (1xK).  Otherwise the full NxK matrix is needed.
+  // y_totals_k = Σ_n y_nk (1×K).  Otherwise the full N×K matrix is needed.
   // The else branch returns a reference to y_mat — no copy.
   const auto& y_obs = [&]() -> decltype(auto) {
-    if constexpr (lin_is_broadcast)
+    if constexpr (eta_is_broadcast)
       return y_mat.colwise().sum().eval();
     else
       return (y_mat);
   }();
 
-  // Log-likelihood: sum_{n,k} y_nk * log p_nk = <y_obs, log_softmax_lin>_F
-  T_partials_return logp = (y_obs * log_softmax_lin).sum();
+  // Log-likelihood: Σ_{n,k} y_nk * log p_nk = <y_obs, log_softmax_eta>_F
+  T_partials_return logp = (y_obs * log_softmax_eta).sum();
   if constexpr (include_summand<propto>::value) {
-    // Multinomial coefficient: sum_n [ lgamma(S_n+1) - sum_k lgamma(y_nk+1) ]
+    // Multinomial coefficient: Σ_n [ lgamma(S_n+1) - Σ_k lgamma(y_nk+1) ]
     logp += lgamma(S + 1.0).sum() - lgamma(y_mat + 1.0).sum();
   }
 
@@ -189,27 +189,27 @@ inline return_type_t<T_x, T_alpha, T_beta> multinomial_logit_glm_lpmf(
 
   auto ops_partials = make_partials_propagator(x_ref, alpha_ref, beta_ref);
   if constexpr (gradients_calc) {
-    // Category probabilities: p_nk = softmax(eta_n)_k = exp_lin_nk / Z_n.
-    const auto softmax_lin = (exp_lin.colwise() / sum_exp_lin).eval();
-    // Gradient of log-likelihood w.r.t. eta:
-    //   dL/d eta_nk = y_nk - S_n * p_nk  =: delta_nk.
-    // When lin_is_broadcast (shared eta): delta is 1xK with y_totals and total S.
-    // Otherwise: delta is NxK with per-instance y_nk and S_n.
+    // Category probabilities: p_nk = softmax(η_n)_k = exp_η_nk / Z_n.
+    const auto softmax_eta = (exp_eta.colwise() / sum_exp_eta).eval();
+    // Gradient of log-likelihood w.r.t. η:
+    //   ∂ℓ/∂η_nk = y_nk - S_n * p_nk  =: δ_nk.
+    // When eta_is_broadcast (shared η): δ is 1×K with y_totals and total S.
+    // Otherwise: δ is N×K with per-instance y_nk and S_n.
     auto delta = [&]() {
-      if constexpr (lin_is_broadcast) {
+      if constexpr (eta_is_broadcast) {
         return (y_obs.template cast<T_partials_return>()
-                - S.sum() * softmax_lin)
+                - S.sum() * softmax_eta)
             .eval();
       } else {
         return (y_obs.template cast<T_partials_return>()
-                - softmax_lin.colwise() * S.template cast<T_partials_return>())
+                - softmax_eta.colwise() * S.template cast<T_partials_return>())
             .eval();
       }
     }();
 
-    // When x is broadcast, dL/d beta = x^T * (sum_n delta_n) and
-    // dL/d x = (sum_n delta_n) * beta^T, so delta is collapsed to 1xK first.
-    // Otherwise dL/d beta = X^T * delta (NxK) and dL/d x = delta * beta^T.
+    // When x is broadcast, ∂ℓ/∂β = xᵀ * (Σ_n δ_n) and
+    // ∂ℓ/∂x = (Σ_n δ_n) * βᵀ, so δ is collapsed to 1×K first.
+    // Otherwise ∂ℓ/∂β = Xᵀ * δ (N×K) and ∂ℓ/∂x = δ * βᵀ.
     const auto delta_mat = [&]() {
       if constexpr (sum_delta_for_x)
         return delta.colwise().sum().matrix().eval();
@@ -218,20 +218,20 @@ inline return_type_t<T_x, T_alpha, T_beta> multinomial_logit_glm_lpmf(
     }();
 
     if constexpr (is_autodiff_v<T_alpha>) {
-      // dL/d alpha_k = sum_n delta_nk  (broadcast alpha, 1xK result)
-      // dL/d alpha_nk = delta_nk       (per-instance alpha, NxK result)
+      // ∂ℓ/∂α_k = Σ_n δ_nk  (broadcast α, 1×K result)
+      // ∂ℓ/∂α_nk = δ_nk     (per-instance α, N×K result)
       if constexpr (T_alpha_rows == 1)
         partials<1>(ops_partials) = delta.colwise().sum();
       else
         partials<1>(ops_partials) = delta;
     }
     if constexpr (is_autodiff_v<T_beta>) {
-      // dL/d beta = X^T * delta_mat  (M x K)
+      // ∂ℓ/∂β = Xᵀ * δ_mat  (M×K)
       partials<2>(ops_partials)
           = x_val.transpose().template cast<T_partials_return>() * delta_mat;
     }
     if constexpr (is_autodiff_v<T_x>) {
-      // dL/d x = delta_mat * beta^T  (N x M, or 1 x M when broadcast)
+      // ∂ℓ/∂x = δ_mat * βᵀ  (N×M, or 1×M when broadcast)
       edge<0>(ops_partials).partials_ = delta_mat * beta_val.transpose();
     }
   }
