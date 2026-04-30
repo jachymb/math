@@ -174,13 +174,12 @@ inline return_type_t<T_x, T_alpha, T_beta> multinomial_logit_glm_lpmf(
       return (y_mat);
   }();
 
-  T_partials_return logp = 0;
+  // Log-likelihood: sum_{n,k} y_nk * log p_nk = <y_obs, log_softmax_lin>_F
+  T_partials_return logp = (y_obs * log_softmax_lin).sum();
   if constexpr (include_summand<propto>::value) {
     // Multinomial coefficient: sum_n [ lgamma(S_n+1) - sum_k lgamma(y_nk+1) ]
     logp += lgamma(S + 1.0).sum() - lgamma(y_mat + 1.0).sum();
   }
-  // Log-likelihood: sum_{n,k} y_nk * log p_nk = <y_obs, log_softmax_lin>_F
-  logp += (y_obs * log_softmax_lin).sum();
 
   if (!isfinite(logp)) {
     check_finite(function, "Weight matrix", beta_ref);
