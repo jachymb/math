@@ -128,12 +128,12 @@ inline return_type_t<T_x, T_alpha, T_beta> multinomial_logit_glm_lpmf(
   const Array<T_partials_return, eta_rows, Dynamic> eta = [&]() {
     if constexpr (T_alpha_rows == 1) {
       // Broadcast α: η = x*β + α (α added to every row)
-      return (x_beta.rowwise() + alpha_val).array().eval();
+      return (x_beta.rowwise() + alpha_val).array();
     } else if constexpr (T_x_rows == 1) {
       // Broadcast x: tile x*β to N rows, then add per-instance α
-      return (x_beta.replicate(N_instances, 1) + alpha_val).array().eval();
+      return (x_beta.replicate(N_instances, 1) + alpha_val).array();
     } else {
-      return (x_beta + alpha_val).array().eval();
+      return (x_beta + alpha_val).array();
     }
   }();
 
@@ -174,6 +174,19 @@ inline return_type_t<T_x, T_alpha, T_beta> multinomial_logit_glm_lpmf(
       return (y_mat);
   }();
 
+  // Log-likelihood (up to the multinomial coefficient when propto=false):
+  //
+  //   ℓ(β, α | y, x) = Σ_n Σ_k y_nk · log p_nk
+  //                   = Σ_n Σ_k y_nk · (η_nk - log Σ_k' exp η_nk')
+  //
+  // where η_nk = (xβ)_nk + α_nk = Σ_m x_nm · β_mk + α_nk
+  // and   p_nk = softmax(η_n)_k = exp(η_nk) / Σ_k' exp(η_nk').
+  //
+  // When propto=false the full PMF adds the multinomial coefficient:
+  //   Σ_n [ lgamma(S_n+1) - Σ_k lgamma(y_nk+1) ],  S_n = Σ_k y_nk.
+  //
+  // In matrix form: ℓ = <y_obs, log_softmax(η)>_F  (Frobenius inner product),
+  // where y_obs is y_mat (N×K) or its column sums (1×K) when η is broadcast.
   // Log-likelihood: Σ_{n,k} y_nk * log p_nk = <y_obs, log_softmax_eta>_F
   T_partials_return logp = (y_obs * log_softmax_eta).sum();
   if constexpr (include_summand<propto>::value) {
