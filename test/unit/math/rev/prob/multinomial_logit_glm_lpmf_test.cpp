@@ -172,6 +172,77 @@ TYPED_TEST(ProbDistributionsMultinomialLogitGLM, glm_matches_simple_big) {
     EXPECT_NEAR(alpha1.adj()[i], alpha2.adj()[i], eps);
 }
 
+TYPED_TEST(ProbDistributionsMultinomialLogitGLM, matrix_alpha_grads) {
+  using stan::math::multinomial_logit_glm_lpmf;
+  using stan::math::var;
+  using matrix_v = typename TypeParam::matrix_v;
+  using row_vector_v = typename TypeParam::row_vector_v;
+  const size_t N = 4, M = 2, K = 3;
+  const double eps = 1e-13;
+  std::vector<std::vector<int>> y{{2, 1, 3}, {0, 4, 1}, {3, 0, 2}, {1, 2, 0}};
+  Eigen::MatrixXd x_val(N, M);
+  x_val << -1.2, 0.5, 0.3, -0.7, 1.0, 0.2, -0.4, 0.8;
+  Eigen::MatrixXd alpha_val(N, K);
+  alpha_val <<  0.2, -0.1,  0.5,
+               -0.3,  0.4,  0.1,
+                0.1,  0.0, -0.2,
+                0.5, -0.3,  0.2;
+  Eigen::MatrixXd beta_val(M, K);
+  beta_val << 0.3, -0.2, 0.1, -0.1, 0.4, -0.3;
+  Eigen::RowVectorXd x_row_val(M);
+  x_row_val << 0.7, -0.3;
+
+  // full x + matrix alpha: exercises the T_alpha_rows != 1 gradient path
+  matrix_v x1 = x_val, x2 = x_val;
+  matrix_v alpha1 = alpha_val, alpha2 = alpha_val;
+  matrix_v beta1 = beta_val, beta2 = beta_val;
+
+  var res1 = 0.0;
+  {
+    auto lin = stan::math::to_ref(
+        stan::math::multiply(x1, beta1) + alpha1);
+    for (size_t n = 0; n < N; ++n)
+      res1 += stan::math::multinomial_logit_lpmf(
+          y[n], lin.row(n).transpose().eval());
+  }
+  var res2 = multinomial_logit_glm_lpmf(y, x2, alpha2, beta2);
+  (res1 + res2).grad();
+  EXPECT_NEAR(res1.val(), res2.val(), eps);
+  for (size_t i = 0; i < M; ++i) {
+    for (size_t j = 0; j < N; ++j)
+      EXPECT_NEAR(x1.adj()(j, i), x2.adj()(j, i), eps);
+    for (size_t j = 0; j < K; ++j)
+      EXPECT_NEAR(beta1.adj()(i, j), beta2.adj()(i, j), eps);
+  }
+  for (size_t n = 0; n < N; ++n)
+    for (size_t k = 0; k < K; ++k)
+      EXPECT_NEAR(alpha1.adj()(n, k), alpha2.adj()(n, k), eps);
+
+  stan::math::set_zero_all_adjoints();
+
+  // broadcast x + matrix alpha: exercises the sum_delta_for_x gradient path
+  row_vector_v x_row = x_row_val;
+  matrix_v x_full = x_row_val.replicate(N, 1);
+  matrix_v alpha3 = alpha_val, alpha4 = alpha_val;
+  matrix_v beta3 = beta_val, beta4 = beta_val;
+
+  var res3 = multinomial_logit_glm_lpmf(y, x_full, alpha3, beta3);
+  var res4 = multinomial_logit_glm_lpmf(y, x_row, alpha4, beta4);
+  (res3 + res4).grad();
+  EXPECT_NEAR(res3.val(), res4.val(), eps);
+  for (size_t i = 0; i < M; ++i) {
+    double x_sum = 0;
+    for (size_t j = 0; j < N; ++j)
+      x_sum += x_full.adj()(j, i);
+    EXPECT_NEAR(x_row.adj()[i], x_sum, eps);
+    for (size_t j = 0; j < K; ++j)
+      EXPECT_NEAR(beta3.adj()(i, j), beta4.adj()(i, j), eps);
+  }
+  for (size_t n = 0; n < N; ++n)
+    for (size_t k = 0; k < K; ++k)
+      EXPECT_NEAR(alpha3.adj()(n, k), alpha4.adj()(n, k), eps);
+}
+
 TYPED_TEST(ProbDistributionsMultinomialLogitGLM, interfaces) {
   using stan::math::multinomial_logit_glm_lpmf;
   using matrix_v = typename TypeParam::matrix_v;
