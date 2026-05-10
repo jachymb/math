@@ -13,9 +13,7 @@
 #include <stan/math/prim/meta.hpp>
 #include <stan/math/prim/err.hpp>
 #include <stan/math/prim/fun/eval.hpp>
-#include <stan/math/prim/fun/size_zero.hpp>
 #include <stan/math/prim/fun/sum.hpp>
-#include <stan/math/prim/fun/to_ref.hpp>
 #include <stan/math/prim/fun/Eigen.hpp>
 
 #include <vector>
@@ -28,10 +26,7 @@ namespace math {
  * with multinomial distribution and softmax (logit) link function.
  * This is an OpenCL overload of
  * `prim/prob/multinomial_logit_glm_lpmf.hpp`.
- *
- * Unlike the prim overload, x must be a full N×M design matrix (broadcasting
- * a single row is not supported here). Alpha can be either a shared 1×K row
- * vector or an N×K per-instance matrix.
+ * Alpha can be either a shared 1×K row vector or an N×K per-instance matrix.
  *
  * @tparam T_x type of the design matrix (N×M kernel expression)
  * @tparam T_alpha type of the intercept (1×K or N×K kernel expression)
@@ -56,22 +51,20 @@ inline return_type_t<T_x, T_alpha, T_beta> multinomial_logit_glm_lpmf(
   static constexpr const char* function = "multinomial_logit_glm_lpmf";
 
   const int N_instances = x.rows();
-  const int N_attributes = x.cols();
   const int N_classes = beta.cols();
 
   check_size_match(function, "Rows of", "x", N_instances, "size of", "y",
                    y.size());
   check_size_match(function, "Columns of", "beta", N_classes, "columns of",
                    "alpha", alpha.cols());
-  check_size_match(function, "Columns of", "x", N_attributes, "rows of",
-                   "beta", beta.rows());
+  check_size_match(function, "Columns of", "x", x.cols(), "rows of", "beta",
+                   beta.rows());
 
-  const int alpha_rows = alpha.rows();
-  if (alpha_rows != 1) {
-    check_size_match(function, "Rows of", "alpha", alpha_rows, "rows of", "x",
+  const bool is_alpha_vector = alpha.rows() == 1;
+  if (!is_alpha_vector) {
+    check_size_match(function, "Rows of", "alpha", alpha.rows(), "rows of", "x",
                      N_instances);
   }
-  const bool is_alpha_vector = alpha_rows == 1;
 
   if (N_instances == 0) {
     return 0;

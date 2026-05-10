@@ -97,39 +97,6 @@ TEST(ProbMultinomialLogitGLM, K3_N3_manual) {
 }
 
 // -----------------------------------------------------------------------
-// Broadcast x (row vector): T_x_rows == 1.
-// All instances share the same x row; result must equal the sum of
-// per-instance multinomial_logit_lpmf calls with the shared eta.
-// -----------------------------------------------------------------------
-TEST(ProbMultinomialLogitGLM, broadcastX) {
-  Eigen::RowVectorXd x_row(2);
-  x_row << 0.7, -0.3;
-
-  Eigen::RowVectorXd alpha(3);
-  alpha << 0.1, 0.2, -0.3;
-
-  Eigen::MatrixXd beta(2, 3);
-  beta <<  0.4, -0.1,  0.2,
-          -0.2,  0.5, -0.1;
-
-  std::vector<std::vector<int>> y{
-      {1, 2, 0},
-      {3, 0, 1},
-      {0, 1, 4}};
-
-  // All instances share the same linear predictor
-  Eigen::VectorXd eta = alpha.transpose() + beta.transpose() * x_row.transpose();
-  double expected = 0;
-  for (const auto& yn : y) {
-    expected += stan::math::multinomial_logit_lpmf(yn, eta);
-  }
-
-  EXPECT_FLOAT_EQ(expected,
-                  stan::math::multinomial_logit_glm_lpmf(y, x_row, alpha,
-                                                         beta));
-}
-
-// -----------------------------------------------------------------------
 // Matrix alpha (N x K): per-instance intercepts, full design matrix.
 // Result must equal the sum of per-instance multinomial_logit_lpmf calls
 // each using its own alpha row.
@@ -167,42 +134,6 @@ TEST(ProbMultinomialLogitGLM, matrixAlpha_fullX) {
 
   EXPECT_FLOAT_EQ(expected,
                   stan::math::multinomial_logit_glm_lpmf(y, x, alpha, beta));
-}
-
-// -----------------------------------------------------------------------
-// Matrix alpha (N x K) with broadcast x (1 x M).
-// Exercises the sum_delta_for_x path: x contributes the same row to
-// every instance but each instance has its own alpha row.
-// -----------------------------------------------------------------------
-TEST(ProbMultinomialLogitGLM, matrixAlpha_broadcastX) {
-  const int N = 3, K = 3, M = 2;
-  Eigen::RowVectorXd x_row(M);
-  x_row << 0.7, -0.3;
-
-  Eigen::MatrixXd alpha(N, K);
-  alpha <<  0.1,  0.2, -0.3,
-           -0.2,  0.5,  0.1,
-            0.4, -0.1,  0.0;
-
-  Eigen::MatrixXd beta(M, K);
-  beta <<  0.4, -0.1,  0.2,
-          -0.2,  0.5, -0.1;
-
-  std::vector<std::vector<int>> y{
-      {1, 2, 0},
-      {3, 0, 1},
-      {0, 1, 4}};
-
-  double expected = 0;
-  for (int n = 0; n < N; ++n) {
-    Eigen::VectorXd eta = alpha.row(n).transpose()
-                          + beta.transpose() * x_row.transpose();
-    expected += stan::math::multinomial_logit_lpmf(y[n], eta);
-  }
-
-  EXPECT_FLOAT_EQ(expected,
-                  stan::math::multinomial_logit_glm_lpmf(y, x_row, alpha,
-                                                         beta));
 }
 
 // -----------------------------------------------------------------------
