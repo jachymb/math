@@ -163,6 +163,57 @@ TEST(ProbMultinomialLogitGLM, propto) {
 }
 
 // -----------------------------------------------------------------------
+// alpha[n,k] = -inf forces softmax probability to 0 for class k on instance n.
+// When y[n,k] = 0 the 0*log(0) term must evaluate to 0 (not NaN).
+// -----------------------------------------------------------------------
+TEST(ProbMultinomialLogitGLM, negInfAlpha) {
+  // N=2, K=3, M=2. Some alpha entries are -inf, forcing p=0 for those classes.
+  const int N = 2, K = 3, M = 2;
+
+  Eigen::MatrixXd x(N, M);
+  x << 1.0,  0.5,
+       0.3, -0.7;
+
+  Eigen::MatrixXd beta(M, K);
+  beta <<  0.3, -0.2,  0.1,
+          -0.1,  0.4, -0.3;
+
+  // Per-instance (N x K) alpha with -inf entries; y is 0 for those classes.
+  Eigen::MatrixXd alpha(N, K);
+  alpha <<  0.2, -0.1, -stan::math::INFTY,
+            -stan::math::INFTY,  0.4,  0.1;
+
+  std::vector<std::vector<int>> y{
+      {2, 1, 0},
+      {0, 3, 2}};
+
+  const double logp = stan::math::multinomial_logit_glm_lpmf(y, x, alpha, beta);
+  EXPECT_TRUE(std::isfinite(logp));
+  EXPECT_LT(logp, 0.0);
+
+  // Reference: -inf drops the class from the softmax, equivalent to
+  // multinomial_logit_lpmf over the remaining classes.
+  // lgamma(0 + 1) = 0 so the normalizing constant is unaffected.
+  double expected = 0;
+  for (int n = 0; n < N; ++n) {
+    const Eigen::VectorXd eta
+        = beta.transpose() * x.row(n).transpose() + alpha.row(n).transpose();
+    std::vector<int> y_in;
+    std::vector<double> eta_in;
+    for (int k = 0; k < K; ++k) {
+      if (std::isfinite(eta(k))) {
+        y_in.push_back(y[n][k]);
+        eta_in.push_back(eta(k));
+      }
+    }
+    expected += stan::math::multinomial_logit_lpmf(
+        y_in, Eigen::Map<const Eigen::VectorXd>(eta_in.data(), eta_in.size()));
+  }
+
+  EXPECT_FLOAT_EQ(expected, logp);
+}
+
+// -----------------------------------------------------------------------
 // Error handling
 // -----------------------------------------------------------------------
 TEST(ProbMultinomialLogitGLM, throwsCorrectly) {

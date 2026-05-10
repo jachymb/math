@@ -37,7 +37,9 @@ namespace math {
  * @param alpha intercept: 1×K broadcast row or N×K per-instance matrix
  * @param beta weight matrix (M×K) on OpenCL device
  * @return log sum of multinomial log PMFs over all N instances
- * @throw std::domain_error if any element of x, beta, or alpha is infinite
+ * @throw std::domain_error if any element of x or beta is infinite or NaN,
+ * or if alpha contains `+inf` or NaN (`-inf` forces the corresponding softmax
+ * probability to zero and is allowed)
  * @throw std::domain_error if any count in y is negative
  * @throw std::invalid_argument if container sizes mismatch
  */
@@ -60,9 +62,10 @@ inline return_type_t<T_x, T_alpha, T_beta> multinomial_logit_glm_lpmf(
   check_size_match(function, "Columns of", "x", x.cols(), "rows of", "beta",
                    beta.rows());
 
-  const bool is_alpha_vector = alpha.rows() == 1;
+  const int alpha_rows = alpha.rows();
+  const bool is_alpha_vector = alpha_rows == 1;
   if (!is_alpha_vector) {
-    check_size_match(function, "Rows of", "alpha", alpha.rows(), "rows of", "x",
+    check_size_match(function, "Rows of", "alpha", alpha_rows, "rows of", "x",
                      N_instances);
   }
 

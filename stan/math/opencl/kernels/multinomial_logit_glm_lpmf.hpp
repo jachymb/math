@@ -22,8 +22,9 @@ static constexpr const char* multinomial_logit_glm_kernel_code = STRINGIFY(
      * The kernel performs two passes over the K classes for instance n:
      *   1. find max(eta[n,:]) for numerical stability,
      *   2. accumulate sum_exp, S_n, and logp using shifted eta
-     *      (eta[n,k] - max) to avoid catastrophic cancellation; if
-     *      need_delta, stash exp(eta[n,k] - max) into delta_global.
+     *      (eta[n,k] - max) to avoid catastrophic cancellation; skips
+     *      skips y_nk=0 terms to implement the 0*log(0)=0 convention;
+     *      if need_delta, stash exp(eta[n,k] - max) into delta_global.
      * A final loop normalizes delta (if need_delta) and subtracts
      * lgamma(y_nk+1) terms (if need_logp_gamma), reading only y_global
      * and delta_global, without re-reading x_beta_global or alpha_global.
@@ -77,7 +78,8 @@ static constexpr const char* multinomial_logit_glm_kernel_code = STRINGIFY(
           sum_exp += exp_k;
           int y_nk = y_global[nk];
           S_n += y_nk;
-          logp += y_nk * shifted_eta_k;
+          if (y_nk != 0)
+            logp += y_nk * shifted_eta_k;
           if (need_delta)
             delta_global[nk] = exp_k;
         }

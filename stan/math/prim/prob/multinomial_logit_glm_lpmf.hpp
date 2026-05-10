@@ -5,7 +5,7 @@
 #include <stan/math/prim/err.hpp>
 #include <stan/math/prim/fun/exp.hpp>
 #include <stan/math/prim/fun/lgamma.hpp>
-#include <stan/math/prim/fun/log.hpp>
+#include <stan/math/prim/fun/lmultiply.hpp>
 #include <stan/math/prim/fun/Eigen.hpp>
 #include <stan/math/prim/fun/size_zero.hpp>
 #include <stan/math/prim/fun/to_matrix.hpp>
@@ -70,8 +70,11 @@ namespace math {
  * or matrix (N x K) with one bias row per instance
  * @param beta weight matrix (M x K)
  * @return log sum of multinomial log PMFs over all N instances
- * @throw std::domain_error if any element of x, beta, or alpha is infinite, or
- * if any count in y is negative
+ * @throw std::domain_error if any element of x or beta is infinite or NaN, or
+ * if alpha contains `+inf` or NaN (`-inf` forces the corresponding softmax
+ * probability to zero and is allowed; if all classes have `-inf` alpha for
+ * some instance but that instance has nonzero counts, the result is undefined),
+ * or if any count in y is negative
  * @throw std::invalid_argument if container sizes mismatch
  */
 template <bool propto, typename T_x, typename T_alpha, typename T_beta,
@@ -136,15 +139,15 @@ inline return_type_t<T_x, T_alpha, T_beta> multinomial_logit_glm_lpmf(
   // Row-max shift for numerical stability; cancels in log-softmax.
   const Array<T_partials_return, Dynamic, Dynamic> shifted_eta
       = (eta.colwise() - eta.rowwise().maxCoeff()).eval();
-  auto&& exp_eta = to_ref_if<need_delta>(exp(shifted_eta));
-  const Array<T_partials_return, Dynamic, 1> sum_exp_eta
-      = exp_eta.rowwise().sum();
+  const Array<T_partials_return, Dynamic, Dynamic> exp_eta = exp(shifted_eta);
+  const Array<T_partials_return, Dynamic, Dynamic> softmax_mat
+      = exp_eta.colwise() / exp_eta.rowwise().sum();
 
   const Array<double, Dynamic, Dynamic> y_mat = to_matrix(y).array();
   const Array<double, Dynamic, 1> instance_totals = y_mat.rowwise().sum();
 
-  T_partials_return logp
-      = (y_mat * (shifted_eta.colwise() - log(sum_exp_eta))).sum();
+  // lmultiply implements 0*log(0)=0: classes with softmax=0 and y=0 contribute 0.
+  T_partials_return logp = lmultiply(y_mat, softmax_mat).sum();
   if constexpr (include_summand<propto>::value) {
     logp += lgamma(instance_totals + 1.0).sum() - lgamma(y_mat + 1.0).sum();
   }
@@ -160,8 +163,8 @@ inline return_type_t<T_x, T_alpha, T_beta> multinomial_logit_glm_lpmf(
     // δ[n,k] = y[n,k] - S_n·p[n,k]
     const Array<T_partials_return, Dynamic, Dynamic> delta
         = y_mat.template cast<T_partials_return>()
-          - exp_eta.colwise()
-                * (instance_totals.template cast<T_partials_return>() / sum_exp_eta);
+          - softmax_mat.colwise()
+                * instance_totals.template cast<T_partials_return>();
 
     if constexpr (is_autodiff_v<T_alpha>) {
       if constexpr (T_alpha_rows == 1)

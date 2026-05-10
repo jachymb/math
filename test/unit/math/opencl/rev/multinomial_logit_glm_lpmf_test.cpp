@@ -264,4 +264,31 @@ TEST(ProbDistributionsMultinomialLogitGLM,
   stan::math::test::compare_cpu_opencl_prim_rev(f_propto, x, alpha, beta);
 }
 
+TEST(ProbDistributionsMultinomialLogitGLM, opencl_neg_inf_alpha) {
+  // alpha[n,k]=-inf forces softmax probability to 0; y[n,k]=0 for those
+  // classes. Result must be finite and match the CPU prim result.
+  int N = 2, M = 2, K = 3;
+  vector<vector<int>> y{{2, 1, 0}, {0, 3, 2}};
+
+  Matrix<double, Dynamic, Dynamic> x(N, M);
+  x << 1.0, 0.5, 0.3, -0.7;
+
+  Matrix<double, Dynamic, Dynamic> beta(M, K);
+  beta << 0.3, -0.2, 0.1, -0.1, 0.4, -0.3;
+
+  Matrix<double, Dynamic, Dynamic> alpha(N, K);
+  alpha << 0.2, -0.1, -stan::math::INFTY, -stan::math::INFTY, 0.4, 0.1;
+
+  const double logp_cpu
+      = stan::math::multinomial_logit_glm_lpmf(y, x, alpha, beta);
+  ASSERT_TRUE(std::isfinite(logp_cpu));
+
+  matrix_cl<double> x_cl(x), alpha_cl(alpha), beta_cl(beta);
+  const double logp_cl
+      = stan::math::multinomial_logit_glm_lpmf(y, x_cl, alpha_cl, beta_cl);
+
+  EXPECT_TRUE(std::isfinite(logp_cl));
+  EXPECT_FLOAT_EQ(logp_cpu, logp_cl);
+}
+
 #endif
