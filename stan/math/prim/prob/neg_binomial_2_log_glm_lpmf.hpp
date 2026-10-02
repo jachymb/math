@@ -8,6 +8,7 @@
 #include <stan/math/prim/fun/constants.hpp>
 #include <stan/math/prim/fun/digamma.hpp>
 #include <stan/math/prim/fun/exp.hpp>
+#include <stan/math/prim/fun/inv.hpp>
 #include <stan/math/prim/fun/lgamma.hpp>
 #include <stan/math/prim/fun/log.hpp>
 #include <stan/math/prim/fun/log1p_exp.hpp>
@@ -190,24 +191,14 @@ neg_binomial_2_log_glm_lpmf(const T_y& y, const T_x& x, const T_alpha& alpha,
   auto ops_partials
       = make_partials_propagator(x_ref, alpha_ref, beta_ref, phi_ref);
   if constexpr (is_any_autodiff_v<T_x, T_beta, T_alpha, T_precision>) {
-    // The partials depend on theta through inv_logit(theta - log(phi)) =
-    // exp(theta) / (exp(theta) + phi) and its complement, evaluated through
-    // exp(-|theta - log(phi)|), which cannot overflow. Written directly in
-    // exp(theta) they have the same values, but their derivatives, which
-    // autodiff over these partials computes (e.g. the Hessian of the embedded
-    // Laplace approximation), cancel catastrophically once exp(theta) / phi is
-    // large and are NaN once exp(theta) overflows.
-    Array<T_partials_return, Dynamic, 1> exp_neg_abs
+    // With e = exp(-|theta - log(phi)|), s = inv_logit(theta - log(phi)) and
+    // 1 - s are 1 / (1 + e) and e / (1 + e) in some order; no exp(theta).
+    Array<T_partials_return, Dynamic, 1> e
         = (theta > log_phi).select(log_phi - theta, theta - log_phi).exp();
-    Array<T_partials_return, Dynamic, 1> inv_1p_exp_neg_abs
-        = (1 + exp_neg_abs).inverse();
+    Array<T_partials_return, Dynamic, 1> inv_1pe = inv(1 + e);
     if constexpr (is_any_autodiff_v<T_x, T_beta, T_alpha>) {
       Matrix<T_partials_return, Dynamic, 1> theta_derivative
-          = y_arr
-            - y_plus_phi
-                  * (theta > log_phi)
-                        .select(inv_1p_exp_neg_abs,
-                                exp_neg_abs * inv_1p_exp_neg_abs);
+          = y_arr - y_plus_phi * (theta > log_phi).select(inv_1pe, e * inv_1pe);
       if constexpr (is_autodiff_v<T_beta>) {
         if constexpr (T_x_rows == 1) {
           edge<2>(ops_partials).partials_ = theta_derivative.sum() * x_val;
@@ -234,11 +225,10 @@ neg_binomial_2_log_glm_lpmf(const T_y& y, const T_x& x, const T_alpha& alpha,
       }
     }
     if constexpr (is_autodiff_v<T_precision>) {
-      // (y + phi) / (exp(theta) + phi)
+      // (y + phi) / (exp(theta) + phi) = (y + phi) / phi * (1 - s)
       Array<T_partials_return, Dynamic, 1> y_plus_phi_over_mean_plus_phi
           = y_plus_phi / phi_arr
-            * (theta > log_phi)
-                  .select(exp_neg_abs * inv_1p_exp_neg_abs, inv_1p_exp_neg_abs);
+            * (theta > log_phi).select(e * inv_1pe, inv_1pe);
       if constexpr (is_vector<T_precision>::value) {
         edge<3>(ops_partials).partials_
             = 1 - y_plus_phi_over_mean_plus_phi + log_phi
