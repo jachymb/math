@@ -190,10 +190,24 @@ neg_binomial_2_log_glm_lpmf(const T_y& y, const T_x& x, const T_alpha& alpha,
   auto ops_partials
       = make_partials_propagator(x_ref, alpha_ref, beta_ref, phi_ref);
   if constexpr (is_any_autodiff_v<T_x, T_beta, T_alpha, T_precision>) {
-    Array<T_partials_return, Dynamic, 1> theta_exp = theta.exp();
+    // The partials depend on theta through inv_logit(theta - log(phi)) =
+    // exp(theta) / (exp(theta) + phi) and its complement, evaluated through
+    // exp(-|theta - log(phi)|), which cannot overflow. Written directly in
+    // exp(theta) they have the same values, but their derivatives, which
+    // autodiff over these partials computes (e.g. the Hessian of the embedded
+    // Laplace approximation), cancel catastrophically once exp(theta) / phi is
+    // large and are NaN once exp(theta) overflows.
+    Array<T_partials_return, Dynamic, 1> exp_neg_abs
+        = (theta > log_phi).select(log_phi - theta, theta - log_phi).exp();
+    Array<T_partials_return, Dynamic, 1> inv_1p_exp_neg_abs
+        = (1 + exp_neg_abs).inverse();
     if constexpr (is_any_autodiff_v<T_x, T_beta, T_alpha>) {
       Matrix<T_partials_return, Dynamic, 1> theta_derivative
-          = y_arr - theta_exp * y_plus_phi / (theta_exp + phi_arr);
+          = y_arr
+            - y_plus_phi
+                  * (theta > log_phi)
+                        .select(inv_1p_exp_neg_abs,
+                                exp_neg_abs * inv_1p_exp_neg_abs);
       if constexpr (is_autodiff_v<T_beta>) {
         if constexpr (T_x_rows == 1) {
           edge<2>(ops_partials).partials_ = theta_derivative.sum() * x_val;
@@ -220,14 +234,19 @@ neg_binomial_2_log_glm_lpmf(const T_y& y, const T_x& x, const T_alpha& alpha,
       }
     }
     if constexpr (is_autodiff_v<T_precision>) {
+      // (y + phi) / (exp(theta) + phi)
+      Array<T_partials_return, Dynamic, 1> y_plus_phi_over_mean_plus_phi
+          = y_plus_phi / phi_arr
+            * (theta > log_phi)
+                  .select(exp_neg_abs * inv_1p_exp_neg_abs, inv_1p_exp_neg_abs);
       if constexpr (is_vector<T_precision>::value) {
         edge<3>(ops_partials).partials_
-            = 1 - y_plus_phi / (theta_exp + phi_arr) + log_phi
+            = 1 - y_plus_phi_over_mean_plus_phi + log_phi
               - logsumexp_theta_logphi + digamma(y_plus_phi) - digamma(phi_arr);
       } else {
         partials<3>(ops_partials)[0]
             = N_instances
-              + sum(-y_plus_phi / (theta_exp + phi_arr) + log_phi
+              + sum(-y_plus_phi_over_mean_plus_phi + log_phi
                     - logsumexp_theta_logphi + digamma(y_plus_phi)
                     - digamma(phi_arr));
       }
