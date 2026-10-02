@@ -71,7 +71,7 @@ inline return_type_t<T_prob> bernoulli_logit_lpmf(const T_n& n,
   }
   // exp(-|ntheta|) in (0, 1], so no overflow enters the autodiff tape
   T_partials_array exp_m_abs_ntheta = exp((ntheta > 0).select(-ntheta, ntheta));
-  T_partials_return logp = sum((ntheta < 0).select(ntheta, T_partials_return(0))
+  T_partials_return logp = sum((ntheta > 0).select(T_partials_return(0), ntheta)
                                - log1p(exp_m_abs_ntheta));
 
   auto ops_partials = make_partials_propagator(theta_ref);
