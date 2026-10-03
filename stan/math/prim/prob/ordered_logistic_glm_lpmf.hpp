@@ -169,10 +169,12 @@ inline return_type_t<T_x, T_beta, T_cuts> ordered_logistic_glm_lpmf(
 
   auto ops_partials = make_partials_propagator(x_ref, beta_ref, cuts_ref);
   if constexpr (is_any_autodiff_v<T_x, T_beta, T_cuts>) {
-    Array<T_partials_return, Dynamic, 1> inv_logit_neg_cut2 = (cut2 > 0).select(
-        exp_m_abs_cut2 / (1 + exp_m_abs_cut2), 1 / (1 + exp_m_abs_cut2));
-    Array<T_partials_return, Dynamic, 1> inv_logit_cut1 = (cut1 > 0).select(
-        1 / (1 + exp_m_abs_cut1), exp_m_abs_cut1 / (1 + exp_m_abs_cut1));
+    Array<T_partials_return, Dynamic, 1> inv_logit_neg_cut2
+        = (cut2 > 0).select(exp_m_abs_cut2, T_partials_return(1))
+          / (1 + exp_m_abs_cut2);
+    Array<T_partials_return, Dynamic, 1> inv_logit_cut1
+        = (cut1 > 0).select(T_partials_return(1), exp_m_abs_cut1)
+          / (1 + exp_m_abs_cut1);
     if constexpr (is_any_autodiff_v<T_x, T_beta>) {
       Matrix<T_partials_return, 1, Dynamic> location_derivative
           = inv_logit_neg_cut2 - inv_logit_cut1;

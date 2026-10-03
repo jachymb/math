@@ -5,7 +5,7 @@
 #include <stan/math/prim/err.hpp>
 #include <stan/math/prim/fun/binomial_coefficient_log.hpp>
 #include <stan/math/prim/fun/digamma.hpp>
-#include <stan/math/prim/fun/inv.hpp>
+#include <stan/math/prim/fun/exp.hpp>
 #include <stan/math/prim/fun/log.hpp>
 #include <stan/math/prim/fun/log1p_exp.hpp>
 #include <stan/math/prim/fun/log_sum_exp.hpp>
@@ -90,9 +90,9 @@ inline return_type_t<T_log_location, T_precision> neg_binomial_2_log_lpmf(
       const T_partials_return e
           = exp(pos ? log_phi[i] - eta_val[i] : eta_val[i] - log_phi[i]);
       const T_partials_return one_p_e = 1 + e;
-      s[i] = pos ? inv(one_p_e) : e / one_p_e;
+      s[i] = (pos ? T_partials_return(1) : e) / one_p_e;
       if constexpr (is_autodiff_v<T_precision>) {
-        one_m_s[i] = pos ? e / one_p_e : inv(one_p_e);
+        one_m_s[i] = (pos ? e : T_partials_return(1)) / one_p_e;
       }
     }
   }

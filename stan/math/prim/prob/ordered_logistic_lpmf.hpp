@@ -169,10 +169,12 @@ inline return_type_t<T_loc, T_cut> ordered_logistic_lpmf(const T_y& y,
 
   auto ops_partials = make_partials_propagator(lambda_ref, c_ref);
   if constexpr (is_any_autodiff_v<T_loc, T_cut>) {
-    Array<T_partials_return, Dynamic, 1> inv_logit_neg_cut2 = (cut2 > 0).select(
-        exp_m_abs_cut2 / (1 + exp_m_abs_cut2), 1 / (1 + exp_m_abs_cut2));
-    Array<T_partials_return, Dynamic, 1> inv_logit_cut1 = (cut1 > 0).select(
-        1 / (1 + exp_m_abs_cut1), exp_m_abs_cut1 / (1 + exp_m_abs_cut1));
+    Array<T_partials_return, Dynamic, 1> inv_logit_neg_cut2
+        = (cut2 > 0).select(exp_m_abs_cut2, T_partials_return(1))
+          / (1 + exp_m_abs_cut2);
+    Array<T_partials_return, Dynamic, 1> inv_logit_cut1
+        = (cut1 > 0).select(T_partials_return(1), exp_m_abs_cut1)
+          / (1 + exp_m_abs_cut1);
     if constexpr (is_autodiff_v<T_loc>) {
       partials<0>(ops_partials) = inv_logit_neg_cut2 - inv_logit_cut1;
     }
