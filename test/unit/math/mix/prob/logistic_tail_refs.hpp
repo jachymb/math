@@ -105,6 +105,21 @@ constexpr logistic_ref lccdf[] = {
     {800, -800.0, -0.5, 0.5, 400.0},
 };
 
+// Second derivative in y of lcdf and of lccdf, both -inv_logit'(z) / sigma^2,
+// at the z of the arrays above; same source.
+constexpr double d2y[] = {0.0,
+                          -1.0620885638228972e-18,
+                          -2.3394057422096057e-14,
+                          -5.152884034854623e-10,
+                          -0.04915298331037046,
+                          -0.0625,
+                          -0.04915298331037046,
+                          -5.152884034854623e-10,
+                          -2.3394057422096057e-14,
+                          -2.133261906436016e-17,
+                          -1.0620885638228972e-18,
+                          0.0};
+
 }  // namespace logistic_tail_refs
 
 #endif

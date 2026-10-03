@@ -46,6 +46,20 @@ inline std::vector<double> derivs() {
           5.9589784505245725e-37,
           0.0};
 }
+// second derivatives, computed the same way
+inline std::vector<double> second_derivs() {
+  return {0.0,
+          1.3455155964317485e-35,
+          1.2996275105706113e-19,
+          6.018298087621098e-14,
+          0.24180038682517271,
+          0.0,
+          -0.24180038682517271,
+          -6.018298087621098e-14,
+          -1.2996275105706113e-19,
+          -1.3455155964317485e-35,
+          0.0};
+}
 inline void expect_rel(double expected, double actual, double x) {
   EXPECT_NEAR(
       expected, actual,
@@ -95,4 +109,29 @@ TEST(mathMixMatFun, PhiApproxDerivativeTails) {
     Phi_approx_test::expect_rel(ds[i], xs_v[i].adj(), xs[i]);
   }
   stan::math::recover_memory();
+}
+
+TEST(mathMixScalFun, PhiApproxFwdDerivativeTails) {
+  using Phi_approx_test::expect_rel;
+  using stan::math::fvar;
+  using stan::math::Phi_approx;
+  using stan::math::var;
+  std::vector<double> xs = Phi_approx_test::args();
+  std::vector<double> ds = Phi_approx_test::derivs();
+  std::vector<double> d2s = Phi_approx_test::second_derivs();
+  for (size_t i = 0; i < xs.size(); ++i) {
+    expect_rel(ds[i], Phi_approx(fvar<double>(xs[i], 1)).d_, xs[i]);
+
+    fvar<fvar<double>> ff(fvar<double>(xs[i], 1), fvar<double>(1, 0));
+    fvar<fvar<double>> y_ff = Phi_approx(ff);
+    expect_rel(ds[i], y_ff.d_.val_, xs[i]);
+    expect_rel(d2s[i], y_ff.d_.d_, xs[i]);
+
+    fvar<var> fv(xs[i], 1);
+    fvar<var> y_fv = Phi_approx(fv);
+    expect_rel(ds[i], y_fv.d_.val(), xs[i]);
+    y_fv.d_.grad();
+    expect_rel(d2s[i], fv.val_.adj(), xs[i]);
+    stan::math::recover_memory();
+  }
 }

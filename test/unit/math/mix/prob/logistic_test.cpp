@@ -14,7 +14,10 @@ using logistic_tail_refs::sigma;
 
 inline void expect_rel(double expected, double actual, const std::string& msg,
                        double tol = 1e-12) {
-  EXPECT_NEAR(expected, actual, tol * std::fabs(expected)) << msg;
+  EXPECT_NEAR(
+      expected, actual,
+      tol * std::fmax(std::fabs(expected), std::numeric_limits<double>::min()))
+      << msg;
 }
 
 auto lpdf = [](const auto& y, const auto& m, const auto& s) {
@@ -61,6 +64,30 @@ void expect_fvar_refs(const F& f, const logistic_ref (&refs)[N]) {
     expect_rel(r.dy, lp_y.d_, msg);
     expect_rel(r.dmu, lp_mu.d_, msg);
     expect_rel(r.dsigma, lp_sigma.d_, msg);
+  }
+}
+
+// Second derivative in y through fvar<fvar<double>> and fvar<var>.
+template <typename F, size_t N>
+void expect_second_refs(const F& f, const logistic_ref (&refs)[N]) {
+  using logistic_tail_refs::d2y;
+  using stan::math::fvar;
+  using stan::math::var;
+  static_assert(N == sizeof(d2y) / sizeof(d2y[0]), "grid mismatch");
+  for (size_t i = 0; i < N; ++i) {
+    const std::string msg = "z = " + std::to_string(refs[i].z);
+    const double y = mu + sigma * refs[i].z;
+    fvar<fvar<double>> y_ff(fvar<double>(y, 1), fvar<double>(1, 0));
+    fvar<fvar<double>> lp_ff = f(y_ff, mu, sigma);
+    expect_rel(refs[i].dy, lp_ff.d_.val_, msg, 1e-13);
+    expect_rel(d2y[i], lp_ff.d_.d_, msg, 1e-13);
+
+    fvar<var> y_fv(y, 1);
+    fvar<var> lp_fv = f(y_fv, mu, sigma);
+    expect_rel(refs[i].dy, lp_fv.d_.val(), msg, 1e-13);
+    lp_fv.d_.grad();
+    expect_rel(d2y[i], y_fv.val_.adj(), msg, 1e-13);
+    stan::math::recover_memory();
   }
 }
 
@@ -220,6 +247,16 @@ TEST_F(AgradRev, mathMixScalFun_logistic_lcdf_tails) {
                                   logistic_tail_refs::lcdf);
   logistic_test::expect_vector_refs(logistic_test::lcdf,
                                     logistic_tail_refs::lcdf);
+}
+
+TEST_F(AgradRev, mathMixScalFun_logistic_lcdf_second_derivative_tails) {
+  logistic_test::expect_second_refs(logistic_test::lcdf,
+                                    logistic_tail_refs::lcdf);
+}
+
+TEST_F(AgradRev, mathMixScalFun_logistic_lccdf_second_derivative_tails) {
+  logistic_test::expect_second_refs(logistic_test::lccdf,
+                                    logistic_tail_refs::lccdf);
 }
 
 TEST_F(AgradRev, mathMixScalFun_logistic_lccdf_tails) {
