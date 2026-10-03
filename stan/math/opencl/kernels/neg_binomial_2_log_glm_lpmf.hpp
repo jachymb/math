@@ -91,12 +91,11 @@ static constexpr const char* neg_binomial_2_log_glm_kernel_code = STRINGIFY(
         }
         theta += alpha[gid * is_alpha_vector];
         double log_phi = log(phi);
-        double logsumexp_theta_logphi;
-        if (theta > log_phi) {
-          logsumexp_theta_logphi = theta + log1p_exp(log_phi - theta);
-        } else {
-          logsumexp_theta_logphi = log_phi + log1p_exp(theta - log_phi);
-        }
+        // s = inv_logit(theta - log_phi) and 1 - s from e, with no exp(theta)
+        double e = exp(-fabs(theta - log_phi));
+        double logsumexp_theta_logphi = fmax(theta, log_phi) + log1p(e);
+        double s = theta > log_phi ? 1 / (1 + e) : e / (1 + e);
+        double one_m_s = theta > log_phi ? e / (1 + e) : 1 / (1 + e);
         double y_plus_phi = y + phi;
         if (need_logp1) {
           logp -= lgamma(y + 1);
@@ -114,13 +113,12 @@ static constexpr const char* neg_binomial_2_log_glm_kernel_code = STRINGIFY(
         if (need_logp4) {
           logp += lgamma(y_plus_phi);
         }
-        double theta_exp = exp(theta);
-        theta_derivative = y - theta_exp * y_plus_phi / (theta_exp + phi);
+        theta_derivative = y - y_plus_phi * s;
         if (need_theta_derivative) {
           theta_derivative_global[gid] = theta_derivative;
         }
         if (need_phi_derivative) {
-          phi_derivative = 1 - y_plus_phi / (theta_exp + phi) + log_phi
+          phi_derivative = 1 - y_plus_phi * one_m_s / phi + log_phi
                            - logsumexp_theta_logphi + digamma(y_plus_phi)
                            - digamma(phi);
           if (!need_phi_derivative_sum) {
