@@ -112,7 +112,7 @@ class arena_matrix<MatrixType, require_eigen_dense_base_t<MatrixType>>
               typename stan::math::arena_matrix<MatrixType>::Base;
           auto other_ptr = make_chainable_ptr(std::move(x));
           // other has it's rows and cols swapped already if it needed that
-          return base_map_t(&(other_ptr->coeffRef(0)), other_ptr->rows(),
+          return base_map_t(other_ptr->data(), other_ptr->rows(),
                             other_ptr->cols());
         }(std::move(other))) {}
 
@@ -130,8 +130,7 @@ class arena_matrix<MatrixType, require_eigen_dense_base_t<MatrixType>>
             require_same_t<T, MatrixType>* = nullptr>
   arena_matrix& operator=(T&& other) {
     auto other_ptr = make_chainable_ptr(std::move(other));
-    new (this)
-        Base(&(other_ptr->coeffRef(0)), other_ptr->rows(), other_ptr->cols());
+    new (this) Base(other_ptr->data(), other_ptr->rows(), other_ptr->cols());
     return *this;
   }
 

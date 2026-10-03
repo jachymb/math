@@ -61,3 +61,38 @@ TEST_F(AgradRev, Rev_to_arena_matrix_test) {
   EXPECT_EQ(b.size(), c.size());
   EXPECT_EQ(b.data(), c.data());
 }
+
+TEST_F(AgradRev, Rev_to_arena_rvalue_matrix_test) {
+  const auto& moved = stan::math::ChainableStack::instance_->var_alloc_stack_;
+  Eigen::VectorXd a(3);
+  a << 1, 2, 3;
+  Eigen::VectorXd expected = a;
+  Eigen::VectorXd b = a;
+
+  // an rvalue keeps its memory, which is kept alive until recover_memory()
+  const double* a_data = a.data();
+  std::size_t n_moved = moved.size();
+  auto a_arena = stan::math::to_arena(std::move(a));
+  EXPECT_EQ(a_data, a_arena.data());
+  EXPECT_EQ(n_moved + 1, moved.size());
+  EXPECT_MATRIX_EQ(expected, a_arena);
+
+  const double* b_data = b.data();
+  auto b_arena = stan::math::to_arena_if<true>(std::move(b));
+  EXPECT_EQ(b_data, b_arena.data());
+  EXPECT_EQ(n_moved + 2, moved.size());
+  EXPECT_MATRIX_EQ(expected, b_arena);
+
+  // an lvalue is copied and left unchanged
+  Eigen::VectorXd c = expected;
+  auto c_arena = stan::math::to_arena(c);
+  EXPECT_NE(c.data(), c_arena.data());
+  EXPECT_EQ(n_moved + 2, moved.size());
+  EXPECT_MATRIX_EQ(expected, c);
+  EXPECT_MATRIX_EQ(expected, c_arena);
+
+  // an empty rvalue is moved as well
+  auto e_arena = stan::math::to_arena(Eigen::VectorXd());
+  EXPECT_EQ(0, e_arena.size());
+  EXPECT_EQ(n_moved + 3, moved.size());
+}

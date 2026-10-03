@@ -58,15 +58,16 @@ inline std::remove_reference_t<T> to_arena(T&& a) {
  * AD stack or schedules its destructor to be called when AD stack memory is
  * recovered.
  *
- * Converts eigen types to `arena_matrix`.
+ * Converts eigen types to `arena_matrix`. A plain matrix passed as an rvalue
+ * is moved, and its memory is freed when AD stack memory is recovered.
  * @tparam T type of argument
  * @param a argument
- * @return argument copied/evaluated on AD stack
+ * @return argument copied/evaluated on AD stack, or moved
  */
 template <typename T, require_eigen_t<T>* = nullptr,
           require_not_same_t<T, arena_t<T>>* = nullptr>
-inline arena_t<T> to_arena(const T& a) {
-  return arena_t<T>(a);
+inline arena_t<T> to_arena(T&& a) {
+  return arena_t<T>(std::forward<T>(a));
 }
 
 /**
@@ -163,8 +164,8 @@ inline T to_arena_if(T&& a) {
 }
 
 template <bool Condition, typename T, std::enable_if_t<Condition>* = nullptr>
-inline arena_t<T> to_arena_if(const T& a) {
-  return to_arena(a);
+inline arena_t<T> to_arena_if(T&& a) {
+  return to_arena(std::forward<T>(a));
 }
 
 }  // namespace math

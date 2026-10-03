@@ -26,13 +26,13 @@ namespace math {
 template <typename Mat1, typename Mat2,
           require_all_matrix_t<Mat1, Mat2>* = nullptr,
           require_any_rev_matrix_t<Mat1, Mat2>* = nullptr>
-inline auto elt_multiply(const Mat1& m1, const Mat2& m2) {
+inline auto elt_multiply(Mat1&& m1, Mat2&& m2) {
   check_matching_dims("elt_multiply", "m1", m1, "m2", m2);
   using inner_ret_type = decltype(value_of(m1).cwiseProduct(value_of(m2)));
   using ret_type = return_var_matrix_t<inner_ret_type, Mat1, Mat2>;
   if constexpr (is_autodiff_v<Mat1> && is_autodiff_v<Mat2>) {
-    arena_t<promote_scalar_t<var, Mat1>> arena_m1 = m1;
-    arena_t<promote_scalar_t<var, Mat2>> arena_m2 = m2;
+    arena_t<promote_scalar_t<var, Mat1>> arena_m1(std::forward<Mat1>(m1));
+    arena_t<promote_scalar_t<var, Mat2>> arena_m2(std::forward<Mat2>(m2));
     arena_t<ret_type> ret(arena_m1.val().cwiseProduct(arena_m2.val()));
     reverse_pass_callback([ret, arena_m1, arena_m2]() mutable {
       for (Eigen::Index j = 0; j < arena_m2.cols(); ++j) {
@@ -45,16 +45,18 @@ inline auto elt_multiply(const Mat1& m1, const Mat2& m2) {
     });
     return ret_type(ret);
   } else if constexpr (is_autodiff_v<Mat1>) {
-    arena_t<promote_scalar_t<var, Mat1>> arena_m1 = m1;
-    arena_t<promote_scalar_t<double, Mat2>> arena_m2 = value_of(m2);
+    arena_t<promote_scalar_t<var, Mat1>> arena_m1(std::forward<Mat1>(m1));
+    arena_t<promote_scalar_t<double, Mat2>> arena_m2
+        = value_of(std::forward<Mat2>(m2));
     arena_t<ret_type> ret(arena_m1.val().cwiseProduct(arena_m2));
     reverse_pass_callback([ret, arena_m1, arena_m2]() mutable {
       arena_m1.adj().array() += arena_m2.array() * ret.adj().array();
     });
     return ret_type(ret);
   } else if constexpr (is_autodiff_v<Mat2>) {
-    arena_t<promote_scalar_t<double, Mat1>> arena_m1 = value_of(m1);
-    arena_t<promote_scalar_t<var, Mat2>> arena_m2 = m2;
+    arena_t<promote_scalar_t<double, Mat1>> arena_m1
+        = value_of(std::forward<Mat1>(m1));
+    arena_t<promote_scalar_t<var, Mat2>> arena_m2(std::forward<Mat2>(m2));
     arena_t<ret_type> ret(arena_m1.cwiseProduct(arena_m2.val()));
     reverse_pass_callback([ret, arena_m2, arena_m1]() mutable {
       arena_m2.adj().array() += arena_m1.array() * ret.adj().array();
