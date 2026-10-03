@@ -78,20 +78,22 @@ inline return_type_t<T_log_location, T_precision> neg_binomial_2_log_lpmf(
   }
 
   VectorBuilder<is_any_autodiff_v<T_log_location, T_precision>,
-                T_partials_return, T_log_location>
-      exp_eta(size_eta);
-  if constexpr (is_any_autodiff_v<T_log_location, T_precision>) {
-    for (size_t i = 0; i < size_eta; ++i) {
-      exp_eta[i] = exp(eta_val[i]);
-    }
-  }
-
-  VectorBuilder<is_any_autodiff_v<T_log_location, T_precision>,
                 T_partials_return, T_log_location, T_precision>
-      exp_eta_over_exp_eta_phi(size_eta_phi);
+      s(size_eta_phi);
+  VectorBuilder<is_autodiff_v<T_precision>, T_partials_return, T_log_location,
+                T_precision>
+      one_m_s(size_eta_phi);
   if constexpr (is_any_autodiff_v<T_log_location, T_precision>) {
+    // s = inv_logit(eta - log(phi)) and 1 - s, without exp(eta)
     for (size_t i = 0; i < size_eta_phi; ++i) {
-      exp_eta_over_exp_eta_phi[i] = inv(phi_val[i] / exp_eta[i] + 1);
+      const bool pos = eta_val[i] > log_phi[i];
+      const T_partials_return e
+          = exp(pos ? log_phi[i] - eta_val[i] : eta_val[i] - log_phi[i]);
+      const T_partials_return one_p_e = 1 + e;
+      s[i] = pos ? inv(one_p_e) : e / one_p_e;
+      if constexpr (is_autodiff_v<T_precision>) {
+        one_m_s[i] = pos ? e / one_p_e : inv(one_p_e);
+      }
     }
   }
 
@@ -118,12 +120,11 @@ inline return_type_t<T_log_location, T_precision> neg_binomial_2_log_lpmf(
             - n_vec[i] * (log_phi[i] + log1p_exp_eta_m_logphi[i]);
 
     if constexpr (is_autodiff_v<T_log_location>) {
-      partials<0>(ops_partials)[i]
-          += n_vec[i] - n_plus_phi[i] * exp_eta_over_exp_eta_phi[i];
+      partials<0>(ops_partials)[i] += n_vec[i] - n_plus_phi[i] * s[i];
     }
     if constexpr (is_autodiff_v<T_precision>) {
       partials<1>(ops_partials)[i]
-          += exp_eta_over_exp_eta_phi[i] - n_vec[i] / (exp_eta[i] + phi_val[i])
+          += s[i] - n_vec[i] / phi_val[i] * one_m_s[i]
              - log1p_exp_eta_m_logphi[i]
              - (digamma(phi_val[i]) - digamma(n_plus_phi[i]));
     }

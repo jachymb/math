@@ -190,10 +190,16 @@ neg_binomial_2_log_glm_lpmf(const T_y& y, const T_x& x, const T_alpha& alpha,
   auto ops_partials
       = make_partials_propagator(x_ref, alpha_ref, beta_ref, phi_ref);
   if constexpr (is_any_autodiff_v<T_x, T_beta, T_alpha, T_precision>) {
-    Array<T_partials_return, Dynamic, 1> theta_exp = theta.exp();
+    // With e = exp(-|theta - log(phi)|), s = inv_logit(theta - log(phi)) and
+    // 1 - s are 1 / (1 + e) and e / (1 + e) in some order; no exp(theta).
+    Array<T_partials_return, Dynamic, 1> e
+        = (theta > log_phi).select(log_phi - theta, theta - log_phi).exp();
+    Array<T_partials_return, Dynamic, 1> one_p_e = 1 + e;
     if constexpr (is_any_autodiff_v<T_x, T_beta, T_alpha>) {
       Matrix<T_partials_return, Dynamic, 1> theta_derivative
-          = y_arr - theta_exp * y_plus_phi / (theta_exp + phi_arr);
+          = y_arr
+            - y_plus_phi * (theta > log_phi).select(T_partials_return(1), e)
+                  / one_p_e;
       if constexpr (is_autodiff_v<T_beta>) {
         if constexpr (T_x_rows == 1) {
           edge<2>(ops_partials).partials_ = theta_derivative.sum() * x_val;
@@ -220,14 +226,18 @@ neg_binomial_2_log_glm_lpmf(const T_y& y, const T_x& x, const T_alpha& alpha,
       }
     }
     if constexpr (is_autodiff_v<T_precision>) {
+      // (y + phi) / (exp(theta) + phi) = (y + phi) (1 - s) / phi
+      Array<T_partials_return, Dynamic, 1> y_plus_phi_over_mean_plus_phi
+          = y_plus_phi * (theta > log_phi).select(e, T_partials_return(1))
+            / (phi_arr * one_p_e);
       if constexpr (is_vector<T_precision>::value) {
         edge<3>(ops_partials).partials_
-            = 1 - y_plus_phi / (theta_exp + phi_arr) + log_phi
+            = 1 - y_plus_phi_over_mean_plus_phi + log_phi
               - logsumexp_theta_logphi + digamma(y_plus_phi) - digamma(phi_arr);
       } else {
         partials<3>(ops_partials)[0]
             = N_instances
-              + sum(-y_plus_phi / (theta_exp + phi_arr) + log_phi
+              + sum(-y_plus_phi_over_mean_plus_phi + log_phi
                     - logsumexp_theta_logphi + digamma(y_plus_phi)
                     - digamma(phi_arr));
       }
