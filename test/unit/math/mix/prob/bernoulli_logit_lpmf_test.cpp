@@ -26,7 +26,7 @@ inline double tol(double x) {
 }  // namespace bernoulli_logit_lpmf_test
 
 // t = (2y - 1) theta in the tails (exp(-t) overflows at t < -709, curvature
-// was lost past |t| = 20) and at t = +-0, where the value's own derivative
+// was 0 below -20) and at t = +-0, where the value's own derivative
 // must not switch branch. Closed forms in every autodiff mode, scalar and
 // vector theta.
 TEST_F(AgradRev, mathMixScalFun_bernoulli_logit_lpmf_tails) {
@@ -36,7 +36,7 @@ TEST_F(AgradRev, mathMixScalFun_bernoulli_logit_lpmf_tails) {
   using stan::math::var;
   std::vector<int> y{1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0};
   Eigen::VectorXd theta(13);
-  theta << -2500, 720, -30, 20.5, -0.25, 0, 0, -0.0, -0.0, 21, -30, 40, -19.5;
+  theta << -2500, 720, -30, 20.5, -0.25, 0, 0, -0.0, -0.0, 21, 21, 40, -19.5;
   const int N = theta.size();
 
   for (int n = 0; n < N; ++n) {

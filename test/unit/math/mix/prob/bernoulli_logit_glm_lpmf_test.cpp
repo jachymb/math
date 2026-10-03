@@ -113,7 +113,7 @@ void expect_derivatives(const T_y& y, const T_x& x,
 }  // namespace bernoulli_logit_glm_test
 
 // t = (2y - 1) theta in the tails (exp(-t) overflows at t < -709, curvature
-// was lost past |t| = 20) and at t = +-0, where the value's own derivative
+// was 0 below -20) and at t = +-0, where the value's own derivative
 // must not switch branch. Matrix and row-vector x, vector and scalar y.
 TEST_F(AgradRev, mathMixScalFun_bernoulli_logit_glm_lpmf_tails) {
   using bernoulli_logit_glm_test::expect_derivatives;
@@ -124,7 +124,7 @@ TEST_F(AgradRev, mathMixScalFun_bernoulli_logit_glm_lpmf_tails) {
   Eigen::VectorXd beta(2);  // dyadic x and beta: theta = 0 exactly
   beta << 0.5, -0.25;
   Eigen::VectorXd theta(13);
-  theta << -2500, 720, -30, 20.5, -0.25, 0, 0, -0.0, -0.0, 21, -30, 40, -19.5;
+  theta << -2500, 720, -30, 20.5, -0.25, 0, 0, -0.0, -0.0, 21, 21, 40, -19.5;
   Eigen::VectorXd alpha = theta - x * beta;
   expect_derivatives(y, x, alpha, beta);
   expect_derivatives(1, x, alpha, beta);
