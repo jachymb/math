@@ -14,28 +14,7 @@ namespace stan {
 namespace math {
 namespace internal {
 /**
- * The inverse logit of x, bit for bit as inv_logit(double) computes it,
- * the inverse logit of -x and exp(-|x|), all from one exponential.
- */
-struct lub_inv_logits {
-  double inv_logit_x;
-  double inv_logit_neg_x;
-  double exp_neg_abs_x;
-  explicit lub_inv_logits(double x) : exp_neg_abs_x(std::exp(-std::fabs(x))) {
-    if (x < 0) {
-      inv_logit_x = x < LOG_EPSILON ? exp_neg_abs_x
-                                    : exp_neg_abs_x / (1.0 + exp_neg_abs_x);
-      inv_logit_neg_x = 1.0 - inv_logit_x;
-    } else {
-      inv_logit_x = 1.0 / (1.0 + exp_neg_abs_x);
-      inv_logit_neg_x = exp_neg_abs_x * inv_logit_x;
-    }
-  }
-};
-
-/**
- * Return in arena memory the inverse logit of x given exp(x), bit for bit as
- * Eigen's logistic(), which inv_logit uses, computes it.
+ * Return in arena memory the inverse logit of x given exp(x).
  *
  * @tparam T type of the array of exp(x)
  * @param exp_x exp(x)
@@ -84,9 +63,11 @@ inline auto lub_constrain(const T& x, const L& lb, const U& ub) {
   } else {
     check_less("lub_constrain", "lb", lb_val, ub_val);
     auto diff = ub_val - lb_val;
-    const internal::lub_inv_logits il(value_of(x));
-    const double inv_logit_x = il.inv_logit_x;
-    const double inv_logit_neg_x = il.inv_logit_neg_x;
+    const double x_val = value_of(x);
+    const double e = std::exp(-std::fabs(x_val));
+    const double inv_logit_x = (x_val >= 0 ? 1.0 : e) / (1.0 + e);
+    const double inv_logit_neg_x
+        = x_val >= 0 ? e * inv_logit_x : 1.0 - inv_logit_x;
     return make_callback_var(
         diff * inv_logit_x + lb_val,
         [x, ub, lb, diff, inv_logit_x, inv_logit_neg_x](auto& vi) mutable {
@@ -154,13 +135,13 @@ inline auto lub_constrain(const T& x, const L& lb, const U& ub,
     return ub_constrain(identity_constrain(x, lb), ub, lp);
   } else {
     check_less("lub_constrain", "lb", lb_val, ub_val);
-    auto neg_abs_x = -abs(value_of(x));
     auto diff = ub_val - lb_val;
-    const internal::lub_inv_logits il(value_of(x));
-    const double inv_logit_x = il.inv_logit_x;
-    const double inv_logit_neg_x = il.inv_logit_neg_x;
-    // log1p(exp_neg_abs_x) equals log1p_exp(neg_abs_x) bit for bit
-    lp += (log(diff) + (neg_abs_x - (2.0 * log1p(il.exp_neg_abs_x))));
+    const double x_val = value_of(x);
+    const double e = std::exp(-std::fabs(x_val));
+    const double inv_logit_x = (x_val >= 0 ? 1.0 : e) / (1.0 + e);
+    const double inv_logit_neg_x
+        = x_val >= 0 ? e * inv_logit_x : 1.0 - inv_logit_x;
+    lp += (log(diff) + (-std::fabs(x_val) - (2.0 * log1p(e))));
     return make_callback_var(
         diff * inv_logit_x + lb_val,
         [x, ub, lb, diff, lp, inv_logit_x, inv_logit_neg_x](auto& vi) mutable {

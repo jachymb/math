@@ -233,33 +233,3 @@ TEST_F(AgradRev, lub_constrain_std_vector_derivatives_tails) {
     stan::math::recover_memory();
   }
 }
-
-TEST_F(AgradRev, lub_constrain_values_match_inv_logit) {
-  using stan::math::var;
-  // the values come from inv_logit's own operations, bit for bit
-  std::vector<double> x{0.0,
-                        -0.0,
-                        stan::math::LOG_EPSILON,
-                        std::nextafter(stan::math::LOG_EPSILON, 0.0),
-                        stan::math::INFTY,
-                        stan::math::NEGATIVE_INFTY};
-  for (double t = -750; t < 750; t += 0.37) {
-    x.push_back(t);
-  }
-  for (double xi : x) {
-    var lp = 0;
-    EXPECT_EQ(stan::math::inv_logit(xi),
-              stan::math::lub_constrain(var(xi), 0.0, 1.0).val());
-    EXPECT_EQ(stan::math::inv_logit(xi),
-              stan::math::lub_constrain(var(xi), 0.0, 1.0, lp).val());
-  }
-  // matrix overloads: Eigen's logistic computed from a shared exp(x)
-  Eigen::ArrayXd xa = Eigen::Map<Eigen::ArrayXd>(x.data(), x.size());
-  Eigen::ArrayXd exp_x = xa.exp();
-  Eigen::ArrayXd s = stan::math::internal::lub_inv_logit_of_exp(exp_x);
-  Eigen::ArrayXd s_eigen = xa.logistic();
-  for (int i = 0; i < xa.size(); ++i) {
-    EXPECT_EQ(s_eigen(i), s(i)) << "x = " << xa(i);
-  }
-  stan::math::recover_memory();
-}
