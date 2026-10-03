@@ -223,4 +223,11 @@ TEST(ProbDistributionsLogistic, opencl_matches_refs_tails) {
   logistic_tail_refs::expect_opencl_refs(logistic_lpdf_functor, far, -800, 1);
 }
 
+TEST(ProbDistributionsLogistic, opencl_near_zero) {
+  // The y and mu partials are -+tanh(z / 2) / sigma; here z = 1e-10.
+  const logistic_tail_refs::logistic_ref near[]
+      = {{1e-10, -2.0794415416798357, -2.5e-11, 2.5e-11, -0.5}};
+  logistic_tail_refs::expect_opencl_refs(logistic_lpdf_functor, near, 0, 2);
+}
+
 #endif
