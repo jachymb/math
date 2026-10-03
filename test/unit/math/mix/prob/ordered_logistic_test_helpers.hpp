@@ -8,23 +8,11 @@
 #include <vector>
 
 /**
- * Derivative checks for ordered_logistic_glm_lpmf and ordered_logistic_lpmf
- * against closed forms, up to third order and for every autodiff nesting.
- *
- * The parameters are v = (beta, cuts). An observation of class k with
- * location theta = x_n beta has, with a = theta - c_{k-1} and
- * b = theta - c_k (c_0 = -inf, c_K = +inf),
- *
- *   log(inv_logit(a) - inv_logit(b))
- *     = log inv_logit(a) + log inv_logit(-b) + log(1 - exp(-(c_k - c_{k-1}))),
- *
- * a sum of univariate functions of linear forms in v (the first term is
- * absent for k = 1, the second for k = K, the third for both). For
- * p = inv_logit(t), q = 1 - p, the first two have derivatives
- * (q, -p q, -p q (q - p)) at t = a and (-p, -p q, -p q (q - p)) at t = b, and
- * with r = 1 / expm1(c_k - c_{k-1}) the third has (r, -r (1 + r),
- * r (1 + r) (1 + 2 r)). Each tolerance is relative to the same sum taken over
- * absolute values.
+ * Closed-form derivative checks in v = (beta, cuts). Class k with
+ * a = theta - c_{k-1}, b = theta - c_k has log p = log inv_logit(a)
+ * + log inv_logit(-b) + log(1 - exp(c_{k-1} - c_k)), a sum of univariate
+ * functions of linear forms in v. Tolerances are relative to the same sums
+ * over absolute values.
  */
 namespace ordered_logistic_test {
 
@@ -38,7 +26,7 @@ template <typename T_y, typename T_x>
 std::vector<term> terms(const T_y& y, const T_x& x, const Eigen::VectorXd& beta,
                         const Eigen::VectorXd& cuts) {
   using stan::math::inv_logit;
-  const int K = beta.size();
+  const int P = beta.size();
   const int C = cuts.size();
   const int N = std::max<int>(x.rows(), stan::math::size(y));
   std::vector<term> out;
@@ -53,9 +41,9 @@ std::vector<term> terms(const T_y& y, const T_x& x, const Eigen::VectorXd& beta,
       }
       const double t = theta - cuts(i);
       const double p = inv_logit(t), q = inv_logit(-t);
-      term tm{Eigen::VectorXd::Zero(K + C), {0, 0, -p * q, -p * q * (q - p)}};
-      tm.l.head(K) = xn;
-      tm.l(K + i) = -1;
+      term tm{Eigen::VectorXd::Zero(P + C), {0, 0, -p * q, -p * q * (q - p)}};
+      tm.l.head(P) = xn;
+      tm.l(P + i) = -1;
       tm.f[0] = side == 0 ? stan::math::log_inv_logit(t)
                           : stan::math::log_inv_logit(-t);
       tm.f[1] = side == 0 ? q : -p;
@@ -64,11 +52,11 @@ std::vector<term> terms(const T_y& y, const T_x& x, const Eigen::VectorXd& beta,
     if (k > 1 && k <= C) {
       const double d = cuts(k - 1) - cuts(k - 2);
       const double r = 1 / std::expm1(d);
-      term tm{Eigen::VectorXd::Zero(K + C),
+      term tm{Eigen::VectorXd::Zero(P + C),
               {stan::math::log1m_exp(-d), r, -r * (1 + r),
                r * (1 + r) * (1 + 2 * r)}};
-      tm.l(K + k - 1) = 1;
-      tm.l(K + k - 2) = -1;
+      tm.l(P + k - 1) = 1;
+      tm.l(P + k - 2) = -1;
       out.push_back(tm);
     }
   }
@@ -76,10 +64,10 @@ std::vector<term> terms(const T_y& y, const T_x& x, const Eigen::VectorXd& beta,
 }
 
 /**
- * Checks value, gradient, Hessian (fvar<var> and fvar<fvar<double>>), third
- * derivatives (fvar<fvar<var>>) and the derivatives of the value itself
- * (fvar<var> and fvar<fvar<double>>) of `lpmf(y, x, beta, cuts)` in
- * (beta, cuts).
+ * Checks value, gradient (var, fvar<double>, fvar<var>, fvar<fvar<double>>),
+ * Hessian (fvar<var>, fvar<fvar<double>>, fvar<fvar<var>>), third derivatives
+ * and the derivative of the value itself (fvar<var>, fvar<fvar<double>>) of
+ * `lpmf(y, x, beta, cuts)` in (beta, cuts).
  */
 template <typename F, typename T_y, typename T_x>
 void expect_derivatives(const F& lpmf, const T_y& y, const T_x& x,
@@ -87,8 +75,8 @@ void expect_derivatives(const F& lpmf, const T_y& y, const T_x& x,
                         const Eigen::VectorXd& cuts) {
   using stan::math::fvar;
   using stan::math::var;
-  const int K = beta.size();
-  const int M = K + cuts.size();
+  const int P = beta.size();
+  const int M = P + cuts.size();
   Eigen::VectorXd v(M);
   v << beta, cuts;
   const double tiny = std::numeric_limits<double>::min();
@@ -111,7 +99,7 @@ void expect_derivatives(const F& lpmf, const T_y& y, const T_x& x,
   }
 
   auto f = [&](const auto& u) {
-    return lpmf(y, x, u.head(K).eval(), u.tail(M - K).eval());
+    return lpmf(y, x, u.head(P).eval(), u.tail(M - P).eval());
   };
   double fx;
   Eigen::VectorXd grad, grad_fwd;
@@ -137,8 +125,25 @@ void expect_derivatives(const F& lpmf, const T_y& y, const T_x& x,
     }
   }
 
-  // derivative of the value itself
+  // first order: var, fvar<double>
   stan::math::nested_rev_autodiff nested;
+  Eigen::Matrix<var, Eigen::Dynamic, 1> v_v(M);
+  for (int k = 0; k < M; ++k) {
+    v_v(k) = v(k);
+  }
+  f(v_v).grad();
+  for (int i = 0; i < M; ++i) {
+    const double gt = 1e-13 * g_tol(i) + tiny;
+    EXPECT_NEAR(v_v(i).adj(), g(i), gt) << i;
+    Eigen::Matrix<fvar<double>, Eigen::Dynamic, 1> v_fd(M);
+    for (int k = 0; k < M; ++k) {
+      v_fd(k) = fvar<double>(v(k), i == k);
+    }
+    EXPECT_NEAR(f(v_fd).d_, g(i), gt) << i;
+  }
+
+  // derivative of the value itself
+  nested.set_zero_all_adjoints();
   Eigen::Matrix<fvar<var>, Eigen::Dynamic, 1> v_fv(M);
   for (int k = 0; k < M; ++k) {
     v_fv(k) = fvar<var>(v(k), 0);
@@ -156,9 +161,11 @@ void expect_derivatives(const F& lpmf, const T_y& y, const T_x& x,
 }
 
 /**
- * Runs `expect_derivatives` at locations equal to a cut, in the tails and
- * between two nearly equal cuts, for every class, vector and scalar y, and
- * (if `row_x`) a row-vector x.
+ * Runs `expect_derivatives` at locations equal to a cut (where the third
+ * derivative is zero, so only orders 1 and 2 test the kink), in the tails,
+ * between nearly equal cuts, at locations where theta - c_k rounds to
+ * theta - c_{k-1}, with a single cut, for every class, vector and scalar y,
+ * and (if `row_x`) a row-vector x.
  */
 template <typename F>
 void expect_all(const F& lpmf, bool row_x) {
@@ -189,6 +196,23 @@ void expect_all(const F& lpmf, bool row_x) {
   x_close.col(0) << 0.25, 0.25 + gap / 4, 0.25 + gap / 2, 0.75, 500.1, 0.5,
       0.75;
   expect_derivatives(lpmf, y_close, x_close, beta, close);
+
+  // theta - c_k rounds to theta - c_{k-1} (theta = 1e17 and 1e14)
+  Eigen::MatrixXd x_far(1, 2);
+  x_far << 5e16, 0;
+  expect_derivatives(lpmf, 2, x_far, beta, Eigen::VectorXd::LinSpaced(2, 0, 1));
+  x_far << 5e13, 0;
+  expect_derivatives(lpmf, 2, x_far, beta,
+                     Eigen::VectorXd::LinSpaced(2, 0, 1e-3));
+
+  // one cut; theta = 0, 0.5, -40
+  Eigen::VectorXd one_cut = Eigen::VectorXd::Zero(1);
+  Eigen::MatrixXd x_one(3, 2);
+  x_one << 0, 0, 0.5, 0.5, -20, 0;
+  expect_derivatives(lpmf, std::vector<int>{1, 2, 1}, x_one, beta, one_cut);
+  for (int k = 1; k <= 2; ++k) {
+    expect_derivatives(lpmf, k, x_one, beta, one_cut);
+  }
 
   if (row_x) {
     for (int n : {0, 2, 6, 7, 10}) {

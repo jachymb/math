@@ -87,9 +87,7 @@ TEST_F(AgradRev,
   }
 }
 
-// Locations equal to a cut (where the value's own derivative must not switch
-// branch), in the tails and between cuts about 1e-9 apart, against closed
-// forms.
+// Against closed forms at and near the cuts, in the tails and for close cuts.
 TEST_F(AgradRev, mathMixScalFun_ordered_logistic_glm_lpmf_derivatives) {
   auto lpmf
       = [](const auto& y, const auto& x, const auto& beta, const auto& cuts) {
