@@ -17,7 +17,7 @@ TEST(mathMixMatFun, log1pExp) {
   stan::test::expect_ad_vector_matvar(f, stan::math::to_vector(args));
 }
 
-TEST(mathMixScalFun, log1pExpHigherDerivativesLargeArgs) {
+TEST(mathMixMatFun, log1pExpHigherDerivativesLargeArgs) {
   using stan::math::fvar;
   using stan::math::log1p_exp;
   using stan::math::var;

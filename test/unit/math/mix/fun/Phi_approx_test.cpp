@@ -1,6 +1,5 @@
 #include <test/unit/math/test_ad.hpp>
-#include <cmath>
-#include <limits>
+#include <test/unit/math/mix/fun/inv_logit_tail_refs.hpp>
 #include <vector>
 
 TEST(mathMixMatFun, PhiApprox) {
@@ -60,23 +59,16 @@ inline std::vector<double> second_derivs() {
           -1.3455155964317485e-35,
           0.0};
 }
-inline void expect_rel(double expected, double actual, double x) {
-  EXPECT_NEAR(
-      expected, actual,
-      1e-13
-          * std::fmax(std::fabs(expected), std::numeric_limits<double>::min()))
-      << "x = " << x;
-}
 }  // namespace Phi_approx_test
 
-TEST(mathMixScalFun, PhiApproxDerivativeTails) {
+TEST(mathMixMatFun, PhiApproxScalarDerivativeTails) {
   using stan::math::var;
   std::vector<double> xs = Phi_approx_test::args();
   std::vector<double> ds = Phi_approx_test::derivs();
   for (size_t i = 0; i < xs.size(); ++i) {
     var a = xs[i];
     stan::math::Phi_approx(a).grad();
-    Phi_approx_test::expect_rel(ds[i], a.adj(), xs[i]);
+    inv_logit_tail_refs::expect_rel(ds[i], a.adj(), xs[i]);
     stan::math::recover_memory();
   }
 }
@@ -92,27 +84,27 @@ TEST(mathMixMatFun, PhiApproxDerivativeTails) {
   stan::math::var_value<Eigen::VectorXd> xv(x);
   sum(Phi_approx(xv)).grad();
   for (int i = 0; i < x.size(); ++i) {
-    Phi_approx_test::expect_rel(ds[i], xv.adj()(i), xs[i]);
+    inv_logit_tail_refs::expect_rel(ds[i], xv.adj()(i), xs[i]);
   }
   stan::math::recover_memory();
 
   Eigen::Matrix<var, Eigen::Dynamic, 1> xm = x;
   sum(Phi_approx(xm)).grad();
   for (int i = 0; i < x.size(); ++i) {
-    Phi_approx_test::expect_rel(ds[i], xm(i).adj(), xs[i]);
+    inv_logit_tail_refs::expect_rel(ds[i], xm(i).adj(), xs[i]);
   }
   stan::math::recover_memory();
 
   std::vector<var> xs_v(xs.begin(), xs.end());
   sum(Phi_approx(xs_v)).grad();
   for (size_t i = 0; i < xs.size(); ++i) {
-    Phi_approx_test::expect_rel(ds[i], xs_v[i].adj(), xs[i]);
+    inv_logit_tail_refs::expect_rel(ds[i], xs_v[i].adj(), xs[i]);
   }
   stan::math::recover_memory();
 }
 
-TEST(mathMixScalFun, PhiApproxFwdDerivativeTails) {
-  using Phi_approx_test::expect_rel;
+TEST(mathMixMatFun, PhiApproxFwdDerivativeTails) {
+  using inv_logit_tail_refs::expect_rel;
   using stan::math::fvar;
   using stan::math::Phi_approx;
   using stan::math::var;

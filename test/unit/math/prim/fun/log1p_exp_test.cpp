@@ -21,7 +21,7 @@ TEST(MathFunctions, log1p_exp_nan) {
 
 namespace log1p_exp_test {
 // Container result c at x matches the scalar log1p_exp(x) within 4 ulp
-void expect_matches_scalar(double x, double c) {
+inline void expect_matches_scalar(double x, double c) {
   double s = stan::math::log1p_exp(x);
   if (std::isnan(s)) {
     EXPECT_TRUE(std::isnan(c)) << "x = " << x;
@@ -85,6 +85,15 @@ TEST(MathFunctions, log1p_exp_containers_match_scalar) {
   for (int k = 0; k < 2; ++k) {
     for (int i = 0; i < n; ++i) {
       expect_matches_scalar(vv[k][i], r_vv[k][i]);
+    }
+  }
+
+  std::vector<std::vector<double>> xss{xs, xs};
+  std::vector<std::vector<double>> r_xss = log1p_exp(xss);
+  ASSERT_EQ(2, r_xss.size());
+  for (int k = 0; k < 2; ++k) {
+    for (int i = 0; i < n; ++i) {
+      expect_matches_scalar(xss[k][i], r_xss[k][i]);
     }
   }
 
