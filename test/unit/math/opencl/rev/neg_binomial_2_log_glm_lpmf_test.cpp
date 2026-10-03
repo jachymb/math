@@ -229,13 +229,14 @@ TEST(ProbDistributionsNegBinomial2LogGLM, opencl_matches_cpu_large_theta) {
   beta << 400, 1;
   double alpha = 0;
   double phi = 1.5;
+  Matrix<double, Dynamic, 1> alpha_vec = Matrix<double, Dynamic, 1>::Zero(N);
   Matrix<double, Dynamic, 1> phi_vec(N, 1);
   phi_vec << 0.5, 1.5, 20;
 
   stan::math::test::compare_cpu_opencl_prim_rev(
       neg_binomial_2_log_glm_lpmf_functor, y, x, alpha, beta, phi);
   stan::math::test::compare_cpu_opencl_prim_rev(
-      neg_binomial_2_log_glm_lpmf_functor, y, x, alpha, beta, phi_vec);
+      neg_binomial_2_log_glm_lpmf_functor, y, x, alpha_vec, beta, phi_vec);
 }
 
 TEST(ProbDistributionsNegBinomial2LogGLM, opencl_matches_cpu_big) {
