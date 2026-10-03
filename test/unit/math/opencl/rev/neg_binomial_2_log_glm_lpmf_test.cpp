@@ -218,15 +218,15 @@ TEST(ProbDistributionsNegBinomial2LogGLM,
 }
 
 TEST(ProbDistributionsNegBinomial2LogGLM, opencl_matches_cpu_large_theta) {
-  // theta = 400, 800 and -800: exp(theta) overflows for 800
+  // theta near 400, 800 and -800: exp(theta) overflows for 800
   int N = 3;
-  int M = 1;
+  int M = 2;
 
   vector<int> y{0, 3, 5};
   Matrix<double, Dynamic, Dynamic> x(N, M);
-  x << 1, 2, -2;
+  x << 1, 0.1, 2, -0.3, -2, 0.2;
   Matrix<double, Dynamic, 1> beta(M, 1);
-  beta << 400;
+  beta << 400, 1;
   double alpha = 0;
   double phi = 1.5;
   Matrix<double, Dynamic, 1> phi_vec(N, 1);
