@@ -199,6 +199,50 @@ TEST_F(AgradRev, mathMixScalFun_logistic_lpdf_large_location) {
   }
 }
 
+TEST_F(AgradRev, mathMixScalFun_logistic_lpdf_hessian_tails) {
+  using logistic_tail_refs::mu;
+  using logistic_tail_refs::sigma;
+  using stan::math::fvar;
+  using stan::math::var;
+  // Hessian in (y, mu, sigma), mpmath at 80 digits; the y and mu block is
+  // -sech(z / 2)^2 / (2 sigma^2), which underflows to 0.
+  for (double z : {-800.0, 800.0}) {
+    const double t = z > 0 ? 0.25 : -0.25;
+    const double hess[3][3] = {{0, 0, t}, {0, 0, -t}, {t, -t, -399.75}};
+    for (int j = 0; j < 3; ++j) {
+      fvar<var> y(mu + sigma * z, j == 0);
+      fvar<var> m(mu, j == 1);
+      fvar<var> s(sigma, j == 2);
+      fvar<var> lp = stan::math::logistic_lpdf(y, m, s);
+      lp.d_.grad();
+      const std::string msg
+          = "z = " + std::to_string(z) + ", row " + std::to_string(j);
+      EXPECT_EQ(hess[j][0], y.val_.adj()) << msg;
+      EXPECT_EQ(hess[j][1], m.val_.adj()) << msg;
+      logistic_test::expect_rel(hess[j][2], s.val_.adj(), msg);
+      stan::math::recover_memory();
+    }
+    // mu the only autodiff argument
+    fvar<var> m(mu, 1);
+    fvar<var> lp = stan::math::logistic_lpdf(mu + sigma * z, m, sigma);
+    lp.d_.grad();
+    EXPECT_EQ(0.0, m.val_.adj()) << "z = " << z << ", mu only";
+    stan::math::recover_memory();
+  }
+}
+
+TEST_F(AgradRev, mathMixScalFun_logistic_lpdf_near_zero) {
+  using stan::math::var;
+  // The y and mu partials are -+tanh(z / 2) / sigma; here z = 1e-10.
+  var y = 2e-10;
+  var m = 0;
+  var s = 2;
+  var lp = stan::math::logistic_lpdf(y, m, s);
+  lp.grad();
+  logistic_test::expect_rel(-2.5e-11, y.adj(), "y", 1e-14);
+  logistic_test::expect_rel(2.5e-11, m.adj(), "mu", 1e-14);
+}
+
 TEST_F(AgradRev, mathMixScalFun_logistic_cdf_tails) {
   using logistic_tail_refs::lcdf;
   using logistic_tail_refs::mu;
