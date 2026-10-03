@@ -3,6 +3,7 @@
 #include <stan/math.hpp>
 #include <gtest/gtest.h>
 #include <test/unit/math/opencl/util.hpp>
+#include <test/unit/math/opencl/rev/logistic_tail_refs_cl.hpp>
 #include <vector>
 
 TEST(ProbDistributionsLogisticLccdf, error_checking) {
@@ -167,4 +168,11 @@ TEST(ProbDistributionsLogisticLccdf, opencl_matches_cpu_tails) {
   stan::math::test::compare_cpu_opencl_prim_rev(logistic_lccdf_functor, y, mu,
                                                 sigma);
 }
+
+TEST(ProbDistributionsLogisticLccdf, opencl_matches_refs_tails) {
+  logistic_tail_refs::expect_opencl_refs(logistic_lccdf_functor,
+                                         logistic_tail_refs::lccdf);
+  logistic_tail_refs::expect_opencl_inf_z(logistic_lccdf_functor);
+}
+
 #endif

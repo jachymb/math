@@ -109,6 +109,41 @@ void expect_vector_refs(const F& f, const logistic_ref (&refs)[N]) {
   }
   EXPECT_NEAR(dmu, m_scal.adj(), 1e-12 * dmu_abs);
   EXPECT_NEAR(dsigma, s_scal.adj(), 1e-12 * dsigma_abs);
+  stan::math::recover_memory();
+
+  // y a scalar with mu and sigma vectors: mu_i = y - sigma * z_i.
+  double dy = 0;
+  double dy_abs = 0;
+  for (const auto& r : refs) {
+    dy += r.dy;
+    dy_abs += std::fabs(r.dy);
+  }
+  var y_scal = mu;
+  std::vector<var> m_vec;
+  std::vector<var> s_vec;
+  for (const auto& r : refs) {
+    m_vec.push_back(mu - sigma * r.z);
+    s_vec.push_back(sigma);
+  }
+  lp = f(y_scal, m_vec, s_vec);
+  lp.grad();
+  EXPECT_NEAR(val, lp.val(), 1e-12 * val_abs);
+  EXPECT_NEAR(dy, y_scal.adj(), 1e-12 * dy_abs);
+  for (size_t i = 0; i < N; ++i) {
+    const std::string msg = "z = " + std::to_string(refs[i].z);
+    expect_rel(refs[i].dmu, m_vec[i].adj(), msg);
+    expect_rel(refs[i].dsigma, s_vec[i].adj(), msg);
+  }
+  stan::math::recover_memory();
+
+  // fvar: y a vector with unit tangents.
+  std::vector<stan::math::fvar<double>> y_fv;
+  for (const auto& r : refs) {
+    y_fv.emplace_back(mu + sigma * r.z, 1.0);
+  }
+  stan::math::fvar<double> lp_fv = f(y_fv, mu, sigma);
+  EXPECT_NEAR(val, lp_fv.val_, 1e-12 * val_abs);
+  EXPECT_NEAR(dy, lp_fv.d_, 1e-12 * dy_abs);
 }
 }  // namespace logistic_test
 
@@ -217,4 +252,48 @@ TEST_F(AgradRev, mathMixScalFun_logistic_infinite_y) {
   expect(logistic_test::lcdf, inf, 0);
   expect(logistic_test::lccdf, -inf, 0);
   expect(logistic_test::lccdf, inf, -inf);
+
+  // Behaviour change: develop returned -inf here with the partials of the
+  // elements before y = inf left non-zero.
+  std::vector<var> y{1.0, inf};
+  var m = 0.5;
+  var s = 2;
+  var lp = stan::math::logistic_lccdf(y, m, s);
+  lp.grad();
+  EXPECT_EQ(-inf, lp.val());
+  EXPECT_EQ(0.0, y[0].adj());
+  EXPECT_EQ(0.0, m.adj());
+  EXPECT_EQ(0.0, s.adj());
+
+  // +0, not -0
+  EXPECT_FALSE(std::signbit(stan::math::logistic_lcdf(inf, 0.5, 2.0)));
+  EXPECT_FALSE(std::signbit(
+      stan::math::logistic_lcdf(std::vector<double>{inf}, 0.5, 2.0)));
+  EXPECT_FALSE(std::signbit(
+      stan::math::logistic_lccdf(std::vector<double>{-1e4}, 0.5, 2.0)));
+}
+
+TEST_F(AgradRev, mathMixScalFun_logistic_infinite_z) {
+  using stan::math::var;
+  const double inf = std::numeric_limits<double>::infinity();
+  // Finite y and mu with (y - mu) / sigma overflowing to -inf, then +inf;
+  // the sigma partial is inf * 0 there, set to 0.
+  auto expect = [](const auto& f, double y_dbl, double expected) {
+    var y = y_dbl;
+    var m = -y_dbl;
+    var s = 1;
+    var lp = f(y, m, s);
+    lp.grad();
+    EXPECT_EQ(expected, lp.val());
+    EXPECT_FALSE(std::isnan(y.adj()));
+    EXPECT_FALSE(std::isnan(m.adj()));
+    EXPECT_EQ(0.0, s.adj());
+    stan::math::set_zero_all_adjoints();
+  };
+  expect(logistic_test::cdf, -1e308, 0);
+  expect(logistic_test::cdf, 1e308, 1);
+  expect(logistic_test::lcdf, -1e308, -inf);
+  expect(logistic_test::lcdf, 1e308, 0);
+  expect(logistic_test::lccdf, -1e308, 0);
+  expect(logistic_test::lccdf, 1e308, -inf);
 }

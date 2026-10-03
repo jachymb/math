@@ -3,18 +3,20 @@
 
 #include <stan/math/prim/meta.hpp>
 #include <stan/math/prim/err.hpp>
+#include <stan/math/prim/fun/abs.hpp>
+#include <stan/math/prim/fun/as_value_column_array_or_scalar.hpp>
 #include <stan/math/prim/fun/constants.hpp>
-#include <stan/math/prim/fun/exp.hpp>
-#include <stan/math/prim/fun/log.hpp>
+#include <stan/math/prim/fun/inv.hpp>
 #include <stan/math/prim/fun/inv_logit.hpp>
+#include <stan/math/prim/fun/log.hpp>
+#include <stan/math/prim/fun/log1p_exp.hpp>
+#include <stan/math/prim/fun/sum.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
-#include <stan/math/prim/fun/max_size.hpp>
+#include <stan/math/prim/fun/select.hpp>
 #include <stan/math/prim/fun/size.hpp>
 #include <stan/math/prim/fun/size_zero.hpp>
-#include <stan/math/prim/fun/value_of.hpp>
-#include <stan/math/prim/prob/logistic_lpdf.hpp>
+#include <stan/math/prim/fun/to_ref.hpp>
 #include <stan/math/prim/functor/partials_propagator.hpp>
-#include <cmath>
 
 namespace stan {
 namespace math {
@@ -26,69 +28,62 @@ inline return_type_t<T_y, T_loc, T_scale> logistic_lcdf(const T_y& y,
                                                         const T_loc& mu,
                                                         const T_scale& sigma) {
   using T_partials_return = partials_return_t<T_y, T_loc, T_scale>;
-  using std::exp;
-  using std::log;
-  using T_y_ref = ref_type_t<T_y>;
-  using T_mu_ref = ref_type_t<T_loc>;
-  using T_sigma_ref = ref_type_t<T_scale>;
+  using T_y_ref = ref_type_if_not_constant_t<T_y>;
+  using T_mu_ref = ref_type_if_not_constant_t<T_loc>;
+  using T_sigma_ref = ref_type_if_not_constant_t<T_scale>;
   static constexpr const char* function = "logistic_lcdf";
   check_consistent_sizes(function, "Random variable", y, "Location parameter",
                          mu, "Scale parameter", sigma);
   T_y_ref y_ref = y;
   T_mu_ref mu_ref = mu;
   T_sigma_ref sigma_ref = sigma;
-  check_not_nan(function, "Random variable", y_ref);
-  check_finite(function, "Location parameter", mu_ref);
-  check_positive_finite(function, "Scale parameter", sigma_ref);
+  decltype(auto) y_val = to_ref(as_value_column_array_or_scalar(y_ref));
+  decltype(auto) mu_val = to_ref(as_value_column_array_or_scalar(mu_ref));
+  decltype(auto) sigma_val = to_ref(as_value_column_array_or_scalar(sigma_ref));
+  check_not_nan(function, "Random variable", y_val);
+  check_finite(function, "Location parameter", mu_val);
+  check_positive_finite(function, "Scale parameter", sigma_val);
 
   if (size_zero(y, mu, sigma)) {
     return 0;
   }
 
-  T_partials_return P(0.0);
   auto ops_partials = make_partials_propagator(y_ref, mu_ref, sigma_ref);
-
-  scalar_seq_view<T_y_ref> y_vec(y_ref);
-  scalar_seq_view<T_mu_ref> mu_vec(mu_ref);
-  scalar_seq_view<T_sigma_ref> sigma_vec(sigma_ref);
-  size_t N = max_size(y, mu, sigma);
 
   // Explicit return for extreme values
   // The gradients are technically ill-defined, but treated as zero
-  for (size_t i = 0; i < stan::math::size(y); i++) {
-    if (y_vec.val(i) == NEGATIVE_INFTY) {
+  scalar_seq_view<decltype(y_val)> y_vec(y_val);
+  for (size_t i = 0; i < stan::math::size(y_val); i++) {
+    if (y_vec[i] == NEGATIVE_INFTY) {
       return ops_partials.build(NEGATIVE_INFTY);
     }
   }
 
-  for (size_t n = 0; n < N; n++) {
-    // Explicit results for extreme values
-    // The gradients are technically ill-defined, but treated as zero
-    if (y_vec.val(n) == INFTY) {
-      continue;
-    }
+  const auto& inv_sigma
+      = to_ref_if<is_any_autodiff_v<T_y, T_loc, T_scale>>(inv(sigma_val));
+  const auto& z = to_ref((y_val - mu_val) * inv_sigma);
+  T_partials_return P;
+  if constexpr (std::is_arithmetic<std::decay_t<decltype(z)>>::value) {
+    // log(inv_logit(z)): within 2 ulp for z < 0, cheaper than log1p_exp
+    P = z < LOG_EPSILON ? z : z < 0 ? log(inv_logit(z)) : 0.0 - log1p_exp(-z);
+  } else {
+    P = 0.0 - sum(log1p_exp(-z));  // +0, not -0, at y = inf
+  }
 
-    const T_partials_return y_dbl = y_vec.val(n);
-    const T_partials_return mu_dbl = mu_vec.val(n);
-    const T_partials_return sigma_dbl = sigma_vec.val(n);
-    const T_partials_return sigma_inv_vec = 1.0 / sigma_vec.val(n);
-
-    // TODO(Andrew) Further simplify derivatives and log-scale below
-    const T_partials_return Pn = inv_logit((y_dbl - mu_dbl) * sigma_inv_vec);
-    P += log(Pn);
-
+  if constexpr (is_any_autodiff_v<T_y, T_loc, T_scale>) {
+    // d/dz log(inv_logit(z)) = inv_logit(-z)
+    const auto& dz = to_ref_if<
+        (is_autodiff_v<T_y> + is_autodiff_v<T_loc> + is_autodiff_v<T_scale>)
+        >= 2>(inv_logit(-z) * inv_sigma);
     if constexpr (is_autodiff_v<T_y>) {
-      partials<0>(ops_partials)[n]
-          += exp(logistic_lpdf(y_dbl, mu_dbl, sigma_dbl)) / Pn;
+      partials<0>(ops_partials) = dz;
     }
     if constexpr (is_autodiff_v<T_loc>) {
-      partials<1>(ops_partials)[n]
-          += -exp(logistic_lpdf(y_dbl, mu_dbl, sigma_dbl)) / Pn;
+      partials<1>(ops_partials) = -dz;
     }
     if constexpr (is_autodiff_v<T_scale>) {
-      partials<2>(ops_partials)[n]
-          += -(y_dbl - mu_dbl) * sigma_inv_vec
-             * exp(logistic_lpdf(y_dbl, mu_dbl, sigma_dbl)) / Pn;
+      // z = +-inf contributes 0, not inf * 0
+      partials<2>(ops_partials) = select(abs(z) == INFTY, 0.0, -z * dz);
     }
   }
   return ops_partials.build(P);
