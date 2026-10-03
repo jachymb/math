@@ -67,15 +67,14 @@ inline return_type_t<T_y_cl, T_loc_cl, T_scale_cl> logistic_cdf(
   auto cond = y_val == INFTY;
   auto inv_sigma = elt_divide(1.0, sigma_val);
   auto mu_minus_y_div_sigma = elt_multiply(mu_val - y_val, inv_sigma);
-  auto exp_scaled_diff = exp(mu_minus_y_div_sigma);
-  auto Pn = elt_divide(1.0, 1.0 + exp_scaled_diff);
+  auto Pn = inv_logit(-mu_minus_y_div_sigma);
   auto P_expr = colwise_prod(select(cond, 1.0, Pn));
 
-  auto y_deriv_tmp = select(cond, 0.0,
-                            elt_divide(exp(mu_minus_y_div_sigma - log(sigma_val)
-                                           - 2.0 * log1p(exp_scaled_diff)),
-                                       Pn));
-  auto sigma_deriv_tmp = elt_multiply(y_deriv_tmp, mu_minus_y_div_sigma);
+  auto y_deriv_tmp = select(
+      cond, 0.0, elt_multiply(inv_logit(mu_minus_y_div_sigma), inv_sigma));
+  auto sigma_deriv_tmp
+      = select(isinf(mu_minus_y_div_sigma), 0.0,
+               elt_multiply(y_deriv_tmp, mu_minus_y_div_sigma));
 
   matrix_cl<char> any_y_neg_inf_cl;
   matrix_cl<double> P_cl;

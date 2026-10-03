@@ -64,18 +64,14 @@ inline return_type_t<T_y_cl, T_loc_cl, T_scale_cl> logistic_lcdf(
   auto sigma_positive_finite_expr = 0 < sigma_val && isfinite(sigma_val);
 
   auto any_y_neg_inf = colwise_max(cast<char>(y_val == NEGATIVE_INFTY));
-  auto cond = y_val == INFTY;
   auto inv_sigma = elt_divide(1.0, sigma_val);
   auto mu_minus_y_div_sigma = elt_multiply(mu_val - y_val, inv_sigma);
-  auto exp_scaled_diff = exp(mu_minus_y_div_sigma);
-  auto Pn = elt_divide(1.0, 1.0 + exp_scaled_diff);
-  auto P_expr = colwise_sum(log(Pn));
+  auto P_expr = colwise_sum(log1p_exp(mu_minus_y_div_sigma));
 
-  auto y_deriv = elt_divide(
-      exp(mu_minus_y_div_sigma - log(sigma_val) - 2.0 * log1p(exp_scaled_diff)),
-      Pn);
+  auto y_deriv = elt_multiply(inv_logit(mu_minus_y_div_sigma), inv_sigma);
   auto mu_deriv = -y_deriv;
-  auto sigma_deriv = elt_multiply(y_deriv, mu_minus_y_div_sigma);
+  auto sigma_deriv = select(isinf(mu_minus_y_div_sigma), 0.0,
+                            elt_multiply(y_deriv, mu_minus_y_div_sigma));
 
   matrix_cl<char> any_y_neg_inf_cl;
   matrix_cl<double> P_cl;
@@ -95,7 +91,7 @@ inline return_type_t<T_y_cl, T_loc_cl, T_scale_cl> logistic_lcdf(
     return NEGATIVE_INFTY;
   }
 
-  T_partials_return P = (from_matrix_cl(P_cl)).sum();
+  T_partials_return P = 0.0 - from_matrix_cl(P_cl).sum();  // +0, not -0
 
   auto ops_partials = make_partials_propagator(y_col, mu_col, sigma_col);
 

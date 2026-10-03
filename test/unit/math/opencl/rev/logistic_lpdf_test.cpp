@@ -3,6 +3,7 @@
 #include <stan/math.hpp>
 #include <gtest/gtest.h>
 #include <test/unit/math/opencl/util.hpp>
+#include <test/unit/math/opencl/rev/logistic_tail_refs_cl.hpp>
 #include <vector>
 
 TEST(ProbDistributionsLogistic, error_checking) {
@@ -192,6 +193,34 @@ TEST(ProbDistributionsLogistic, opencl_sigma_mu_scalar) {
                                                 sigma);
   stan::math::test::compare_cpu_opencl_prim_rev(logistic_lpdf_functor_propto, y,
                                                 mu, sigma);
+}
+
+TEST(ProbDistributionsLogistic, opencl_matches_cpu_tails) {
+  Eigen::VectorXd y(12);
+  y << -1599.5, -79.5, -59.5, -39.5, -1.5, 0.5, 2.5, 40.5, 60.5, 74.5, 80.5,
+      1600.5;
+  Eigen::VectorXd mu = Eigen::VectorXd::Constant(12, 0.5);
+  Eigen::VectorXd sigma = Eigen::VectorXd::Constant(12, 2.0);
+  stan::math::test::compare_cpu_opencl_prim_rev(logistic_lpdf_functor, y, mu,
+                                                sigma);
+
+  Eigen::VectorXd y_far(2);
+  y_far << 801.0, -799.0;
+  Eigen::VectorXd mu_far(2);
+  mu_far << 800.0, -800.0;
+  stan::math::test::compare_cpu_opencl_prim_rev(logistic_lpdf_functor, y_far,
+                                                mu_far, 1.0);
+}
+
+TEST(ProbDistributionsLogistic, opencl_matches_refs_tails) {
+  logistic_tail_refs::expect_opencl_refs(logistic_lpdf_functor,
+                                         logistic_tail_refs::lpdf);
+  // mpmath at 60 digits; z = 1 with |mu / sigma| = 800
+  const logistic_tail_refs::logistic_ref far[]
+      = {{1, -1.6265233750364457, -0.46211715726000976, 0.46211715726000976,
+          -0.53788284273999024}};
+  logistic_tail_refs::expect_opencl_refs(logistic_lpdf_functor, far, 800, 1);
+  logistic_tail_refs::expect_opencl_refs(logistic_lpdf_functor, far, -800, 1);
 }
 
 #endif

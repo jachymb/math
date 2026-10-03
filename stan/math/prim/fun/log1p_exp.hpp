@@ -5,7 +5,9 @@
 #include <stan/math/prim/fun/exp.hpp>
 #include <stan/math/prim/fun/log.hpp>
 #include <stan/math/prim/fun/log1p.hpp>
+#include <stan/math/prim/fun/to_ref.hpp>
 #include <stan/math/prim/functor/apply_scalar_unary.hpp>
+#include <stan/math/prim/functor/apply_vector_unary.hpp>
 #include <cmath>
 
 namespace stan {
@@ -66,18 +68,34 @@ struct log1p_exp_fun {
 };
 
 /**
- * Vectorized version of log1p_exp().
+ * Vectorized version of log1p_exp() for containers of autodiff types.
  *
  * @tparam T type of container
  * @param x container
  * @return Natural log of (1 + exp()) applied to each value in x.
  */
-template <typename T,
+template <typename T, require_ad_container_t<T>* = nullptr,
           require_not_nonscalar_prim_or_rev_kernel_expression_t<T>* = nullptr,
-          require_container_t<T>* = nullptr,
           require_not_var_matrix_t<T>* = nullptr>
 inline auto log1p_exp(T&& x) {
   return apply_scalar_unary<log1p_exp_fun, T>::apply(std::forward<T>(x));
+}
+
+/**
+ * Vectorized version of log1p_exp() for containers of arithmetic types.
+ *
+ * @tparam T type of `std::vector` or Eigen type with arithmetic scalars
+ * @param x container
+ * @return Natural log of (1 + exp()) applied to each value in x.
+ */
+template <typename T, require_container_bt<std::is_arithmetic, T>* = nullptr,
+          require_not_nonscalar_prim_or_rev_kernel_expression_t<T>* = nullptr>
+inline auto log1p_exp(T&& x) {
+  return apply_vector_unary<ref_type_t<T>>::apply(
+      to_ref(std::forward<T>(x)), [](auto&& v) {
+        return v.array().template cast<double>().max(0.0)
+               + (-v.array().template cast<double>().abs()).exp().log1p();
+      });
 }
 
 }  // namespace math

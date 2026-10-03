@@ -3,6 +3,7 @@
 #include <stan/math.hpp>
 #include <gtest/gtest.h>
 #include <test/unit/math/opencl/util.hpp>
+#include <test/unit/math/opencl/rev/logistic_tail_refs_cl.hpp>
 #include <vector>
 
 TEST(ProbDistributionsLogisticLcdf, error_checking) {
@@ -158,4 +159,31 @@ TEST(ProbDistributionsLogisticLcdf, opencl_matches_cpu_big) {
       logistic_lcdf_functor, y.transpose().eval(), mu.transpose().eval(),
       sigma.transpose().eval());
 }
+TEST(ProbDistributionsLogisticLcdf, opencl_matches_cpu_tails) {
+  Eigen::VectorXd y(12);
+  y << -1599.5, -79.5, -59.5, -39.5, -1.5, 0.5, 2.5, 40.5, 60.5, 74.5, 80.5,
+      1600.5;
+  Eigen::VectorXd mu = Eigen::VectorXd::Constant(12, 0.5);
+  Eigen::VectorXd sigma = Eigen::VectorXd::Constant(12, 2.0);
+  stan::math::test::compare_cpu_opencl_prim_rev(logistic_lcdf_functor, y, mu,
+                                                sigma);
+}
+TEST(ProbDistributionsLogisticLcdf, opencl_matches_cpu_small_y_pos_inf) {
+  Eigen::VectorXd y(3);
+  y << 0.3, INFINITY, 1.0;
+  Eigen::VectorXd mu(3);
+  mu << 0.3, 0.8, 1.0;
+  Eigen::VectorXd sigma(3);
+  sigma << 0.3, 0.8, 1.0;
+
+  stan::math::test::compare_cpu_opencl_prim_rev(logistic_lcdf_functor, y, mu,
+                                                sigma);
+}
+
+TEST(ProbDistributionsLogisticLcdf, opencl_matches_refs_tails) {
+  logistic_tail_refs::expect_opencl_refs(logistic_lcdf_functor,
+                                         logistic_tail_refs::lcdf);
+  logistic_tail_refs::expect_opencl_inf_z(logistic_lcdf_functor);
+}
+
 #endif
