@@ -72,9 +72,8 @@ inline return_type_t<T_y, T_loc, T_scale> logistic_lcdf(const T_y& y,
 
   if constexpr (is_any_autodiff_v<T_y, T_loc, T_scale>) {
     // d/dz log(inv_logit(z)) = inv_logit(-z)
-    const auto& dz = to_ref_if<
-        (is_autodiff_v<T_y> + is_autodiff_v<T_loc> + is_autodiff_v<T_scale>)
-        >= 2>(inv_logit(-z) * inv_sigma);
+    // evaluated: the expression holds a temporary holder by reference
+    const auto& dz = to_ref(inv_logit(-z) * inv_sigma);
     if constexpr (is_autodiff_v<T_y>) {
       partials<0>(ops_partials) = dz;
     }

@@ -70,9 +70,8 @@ inline return_type_t<T_y, T_loc, T_scale> logistic_lpdf(const T_y& y,
   }
 
   if constexpr (is_any_autodiff_v<T_y, T_loc, T_scale>) {
-    const auto& y_deriv = to_ref_if<
-        (is_autodiff_v<T_y> + is_autodiff_v<T_loc> + is_autodiff_v<T_scale>)
-        >= 2>(-tanh(0.5 * y_minus_mu_div_sigma) * inv_sigma);
+    // evaluated: the expression holds a temporary holder by reference
+    const auto& y_deriv = to_ref(-tanh(0.5 * y_minus_mu_div_sigma) * inv_sigma);
     if constexpr (is_autodiff_v<T_y>) {
       partials<0>(ops_partials) = y_deriv;
     }
