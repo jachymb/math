@@ -6,13 +6,12 @@
 #include <stan/math/prim/fun/as_array_or_scalar.hpp>
 #include <stan/math/prim/fun/as_value_array_or_scalar.hpp>
 #include <stan/math/prim/fun/exp.hpp>
-#include <stan/math/prim/fun/inv_logit.hpp>
 #include <stan/math/prim/fun/is_integer.hpp>
-#include <stan/math/prim/fun/log1p_exp.hpp>
-#include <stan/math/prim/fun/log_inv_logit_diff.hpp>
+#include <stan/math/prim/fun/log1m_exp.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
 #include <stan/math/prim/fun/size.hpp>
 #include <stan/math/prim/fun/size_mvt.hpp>
+#include <stan/math/prim/fun/to_ref.hpp>
 #include <stan/math/prim/fun/value_of.hpp>
 #include <stan/math/prim/fun/vector_seq_view.hpp>
 #include <stan/math/prim/functor/partials_propagator.hpp>
@@ -32,23 +31,11 @@ namespace math {
  *
   \f[
     \frac{\partial }{\partial \lambda} =
-    \begin{cases}\\
-    -\mathrm{logit}^{-1}(\lambda - c_1) & \mbox{if } k = 1,\\
-    -(((1-e^{c_{k-1}-c_{k-2}})^{-1} - \mathrm{logit}^{-1}(c_{k-2}-\lambda)) +
-    ((1-e^{c_{k-2}-c_{k-1}})^{-1} - \mathrm{logit}^{-1}(c_{k-1}-\lambda)))
-    & \mathrm{if } 1 < k < K, \mathrm{and}\\
-    \mathrm{logit}^{-1}(c_{K-2}-\lambda) & \mathrm{if } k = K.
-    \end{cases}
-  \f]
-
-  \f[
-    \frac{\partial }{\partial \lambda} =
     \begin{cases}
     -\mathrm{logit}^{-1}(\lambda - c_1) & \text{if } k = 1,\\
-    -(((1-e^{c_{k-1}-c_{k-2}})^{-1} - \mathrm{logit}^{-1}(c_{k-2}-\lambda)) +
-    ((1-e^{c_{k-2}-c_{k-1}})^{-1} - \mathrm{logit}^{-1}(c_{k-1}-\lambda)))
+    \mathrm{logit}^{-1}(c_{k-1} - \lambda) - \mathrm{logit}^{-1}(\lambda - c_k)
     & \text{if } 1 < k < K, \text{ and}\\
-    \mathrm{logit}^{-1}(c_{K-2}-\lambda) & \text{if } k = K.
+    \mathrm{logit}^{-1}(c_{K-1} - \lambda) & \text{if } k = K.
     \end{cases}
   \f]
  *
@@ -190,11 +177,11 @@ inline return_type_t<T_loc, T_cut> ordered_logistic_lpmf(const T_y& y,
       partials<0>(ops_partials) = inv_logit_neg_cut2 - inv_logit_cut1;
     }
     if constexpr (is_autodiff_v<T_cut>) {
-      // 1 / expm1(c_y - c_{y-1}), zero for the first and last class
-      Array<T_partials_return, Dynamic, 1> r
-          = cuts_diff.exp() / -cuts_diff.expm1();
-      Array<T_partials_return, Dynamic, 1> d1 = inv_logit_neg_cut2 + r;
-      Array<T_partials_return, Dynamic, 1> d2 = inv_logit_cut1 + r;
+      // -1 / expm1(c_y - c_{y-1}), zero for the first and last class
+      Array<T_partials_return, Dynamic, 1> q
+          = cuts_diff.exp() / cuts_diff.expm1();
+      Array<T_partials_return, Dynamic, 1> d1 = inv_logit_neg_cut2 - q;
+      Array<T_partials_return, Dynamic, 1> d2 = inv_logit_cut1 - q;
       for (int i = 0; i < N; i++) {
         int c = y_seq[i];
         if (c != K) {

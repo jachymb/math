@@ -87,16 +87,18 @@ static constexpr const char* ordered_logistic_glm_kernel_code = STRINGIFY(
           }
 
           if (need_location_derivative || need_cuts_derivative) {
-            const double cuts_diff = cut_y2 - cut_y1;
             d1 = inv_logit(-cut2);
             d2 = inv_logit(cut1);
             if (need_location_derivative) {
               location_derivative[gid] = d1 - d2;
             }
-            // 1 / expm1(c_y - c_{y-1}), zero for the first and last class
-            const double r = exp(cuts_diff) / -expm1(cuts_diff);
-            d1 += r;
-            d2 += r;
+            if (need_cuts_derivative) {
+              // -1 / expm1(c_y - c_{y-1}), zero for the first and last class
+              const double cuts_diff = cut_y2 - cut_y1;
+              const double q = exp(cuts_diff) / expm1(cuts_diff);
+              d1 -= q;
+              d2 -= q;
+            }
           }
         }
       }

@@ -188,8 +188,7 @@ inline return_type_t<T_x, T_beta, T_cuts> ordered_logistic_glm_lpmf(
       if constexpr (is_autodiff_v<T_beta>) {
         if constexpr (T_x_rows == 1) {
           edge<1>(ops_partials).partials_
-              = (location_derivative * x_val.replicate(N_instances, 1))
-                    .transpose();
+              = (location_derivative.sum() * x_val).transpose();
         } else {
           edge<1>(ops_partials).partials_
               = (location_derivative * x_val).transpose();
@@ -197,11 +196,11 @@ inline return_type_t<T_x, T_beta, T_cuts> ordered_logistic_glm_lpmf(
       }
     }
     if constexpr (is_autodiff_v<T_cuts>) {
-      // 1 / expm1(c_y - c_{y-1}), zero for the first and last class
-      Array<T_partials_return, Dynamic, 1> r
-          = cuts_diff.exp() / -cuts_diff.expm1();
-      Array<T_partials_return, Dynamic, 1> d1 = inv_logit_neg_cut2 + r;
-      Array<T_partials_return, Dynamic, 1> d2 = inv_logit_cut1 + r;
+      // -1 / expm1(c_y - c_{y-1}), zero for the first and last class
+      Array<T_partials_return, Dynamic, 1> q
+          = cuts_diff.exp() / cuts_diff.expm1();
+      Array<T_partials_return, Dynamic, 1> d1 = inv_logit_neg_cut2 - q;
+      Array<T_partials_return, Dynamic, 1> d2 = inv_logit_cut1 - q;
       for (int i = 0; i < N_instances; i++) {
         int c = y_seq[i];
         if (c != N_classes) {
