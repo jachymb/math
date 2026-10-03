@@ -113,8 +113,10 @@ inline return_type_t<T_x, T_alpha, T_beta> bernoulli_logit_glm_lpmf(
   // exp(-|ytheta|) in (0, 1], so no overflow enters the autodiff tape
   Array<T_partials_return, Dynamic, 1> exp_m_abs_ytheta
       = exp((ytheta > 0).select(-ytheta, ytheta));
-  T_partials_return logp = sum((ytheta > 0).select(T_partials_return(0), ytheta)
-                               - log1p(exp_m_abs_ytheta));
+  // two sums: no per-element node for the difference in nested autodiff
+  T_partials_return logp
+      = sum((ytheta > 0).select(T_partials_return(0), ytheta))
+        - sum(log1p(exp_m_abs_ytheta));
 
   if (!isfinite(logp)) {
     check_finite(function, "Weight vector", beta);
