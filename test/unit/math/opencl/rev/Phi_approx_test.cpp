@@ -19,13 +19,14 @@ TEST(OpenCL_Phi_approx, prim_rev_values_small) {
  * the denominator at 1. References by mpmath at 60 digits.
  */
 TEST(OpenCL_Phi_approx, rev_tail_derivative_against_references) {
-  const int N = 6;
+  const int N = 8;
   Eigen::VectorXd x(N);
-  x << -10, -7, 1, 7, 8, 10;
+  x << -40, -10, -7, 1, 7, 8, 10, 40;
+  // at x = -40 and 40 the true value, about 4e-1987, underflows to 0
   Eigen::VectorXd expected(N);
-  expected << 5.9589784505245725e-37, 5.1340418352583332e-15,
+  expected << 0.0, 5.9589784505245725e-37, 5.1340418352583332e-15,
       0.24152728992165639, 5.1340418352583332e-15, 8.7097694481792379e-21,
-      5.9589784505245725e-37;
+      5.9589784505245725e-37, 0.0;
 
   stan::math::var_value<stan::math::matrix_cl<double>> x_cl(
       stan::math::to_matrix_cl(x));
@@ -33,7 +34,10 @@ TEST(OpenCL_Phi_approx, rev_tail_derivative_against_references) {
 
   const Eigen::VectorXd adj = stan::math::from_matrix_cl(x_cl.adj());
   for (int i = 0; i < N; ++i) {
-    EXPECT_LT(std::fabs(adj[i] / expected[i] - 1.0), 1e-13) << "x = " << x[i];
+    EXPECT_NEAR(
+        expected[i], adj[i],
+        1e-13 * std::fmax(expected[i], std::numeric_limits<double>::min()))
+        << "x = " << x[i];
   }
   stan::math::recover_memory();
 }
