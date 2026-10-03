@@ -1,6 +1,7 @@
 #include <test/unit/math/test_ad.hpp>
 #include <cmath>
 #include <limits>
+#include <vector>
 
 TEST(mathMixMatFun, log1pExp) {
   auto f = [](const auto& x1) { return stan::math::log1p_exp(x1); };
@@ -20,11 +21,26 @@ TEST(mathMixScalFun, log1pExpHigherDerivativesLargeArgs) {
   using stan::math::fvar;
   using stan::math::log1p_exp;
   using stan::math::var;
-  for (double x : {-800, -40, -20, -1, 0, 1, 20, 30, 37, 40, 100, 700, 800}) {
-    // log1p_exp' = inv_logit; compare with closed forms, e = exp(-|x|)
-    double e = std::exp(-std::fabs(x));
-    double d2 = e / ((1 + e) * (1 + e));
-    double d3 = (x > 0 ? 1 : -1) * d2 * std::expm1(-std::fabs(x)) / (1 + e);
+  // {x, log1p_exp''(x), log1p_exp'''(x)}: mpmath, 50 digits; 0 where the
+  // value underflows (e^-800)
+  std::vector<std::vector<double>> points{
+      {-800, 0, 0},
+      {-40, 4.2483542552915889592e-18, 4.2483542552915889231e-18},
+      {-20, 2.0611536139418493437e-9, 2.0611536054451408856e-9},
+      {-1, 1.9661193324148185254e-1, 9.0857747672948409442e-2},
+      {0, 0.25, 0},
+      {1, 1.9661193324148185254e-1, -9.0857747672948409442e-2},
+      {20, 2.0611536139418493437e-9, -2.0611536054451408856e-9},
+      {30, 9.3576229688384233028e-14, -9.3576229688366720006e-14},
+      {37, 8.533047625744064338e-17, -8.5330476257440628818e-17},
+      {40, 4.2483542552915889592e-18, -4.2483542552915889231e-18},
+      {100, 3.720075976020835963e-44, -3.720075976020835963e-44},
+      {700, 9.8596765437597708567e-305, -9.8596765437597708567e-305},
+      {800, 0, 0}};
+  for (const auto& p : points) {
+    double x = p[0];
+    double d2 = p[1];
+    double d3 = p[2];
     double tol2 = 1e-13 * std::fmax(d2, std::numeric_limits<double>::min());
     double tol3
         = 1e-13 * std::fmax(std::fabs(d3), std::numeric_limits<double>::min());
