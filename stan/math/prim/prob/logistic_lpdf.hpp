@@ -6,13 +6,13 @@
 #include <stan/math/prim/fun/as_column_vector_or_scalar.hpp>
 #include <stan/math/prim/fun/as_array_or_scalar.hpp>
 #include <stan/math/prim/fun/as_value_column_array_or_scalar.hpp>
-#include <stan/math/prim/fun/exp.hpp>
 #include <stan/math/prim/fun/log.hpp>
 #include <stan/math/prim/fun/log1p.hpp>
 #include <stan/math/prim/fun/log1p_exp.hpp>
 #include <stan/math/prim/fun/max_size.hpp>
 #include <stan/math/prim/fun/size.hpp>
 #include <stan/math/prim/fun/size_zero.hpp>
+#include <stan/math/prim/fun/tanh.hpp>
 #include <stan/math/prim/fun/to_ref.hpp>
 #include <stan/math/prim/fun/value_of.hpp>
 #include <stan/math/prim/functor/partials_propagator.hpp>
@@ -72,7 +72,7 @@ inline return_type_t<T_y, T_loc, T_scale> logistic_lpdf(const T_y& y,
   if constexpr (is_any_autodiff_v<T_y, T_loc, T_scale>) {
     const auto& y_deriv = to_ref_if<
         (is_autodiff_v<T_y> + is_autodiff_v<T_loc> + is_autodiff_v<T_scale>)
-        >= 2>((2 / (1 + exp(y_minus_mu_div_sigma)) - 1) * inv_sigma);
+        >= 2>(-tanh(0.5 * y_minus_mu_div_sigma) * inv_sigma);
     if constexpr (is_autodiff_v<T_y>) {
       partials<0>(ops_partials) = y_deriv;
     }
