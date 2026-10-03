@@ -217,6 +217,27 @@ TEST(ProbDistributionsNegBinomial2LogGLM,
       neg_binomial_2_log_glm_lpmf_functor_propto, y, x, alpha, beta, phi);
 }
 
+TEST(ProbDistributionsNegBinomial2LogGLM, opencl_matches_cpu_large_theta) {
+  // theta = 400, 800 and -800: exp(theta) overflows for 800
+  int N = 3;
+  int M = 1;
+
+  vector<int> y{0, 3, 5};
+  Matrix<double, Dynamic, Dynamic> x(N, M);
+  x << 1, 2, -2;
+  Matrix<double, Dynamic, 1> beta(M, 1);
+  beta << 400;
+  double alpha = 0;
+  double phi = 1.5;
+  Matrix<double, Dynamic, 1> phi_vec(N, 1);
+  phi_vec << 0.5, 1.5, 20;
+
+  stan::math::test::compare_cpu_opencl_prim_rev(
+      neg_binomial_2_log_glm_lpmf_functor, y, x, alpha, beta, phi);
+  stan::math::test::compare_cpu_opencl_prim_rev(
+      neg_binomial_2_log_glm_lpmf_functor, y, x, alpha, beta, phi_vec);
+}
+
 TEST(ProbDistributionsNegBinomial2LogGLM, opencl_matches_cpu_big) {
   int N = 153;
   int M = 71;
