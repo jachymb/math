@@ -194,4 +194,20 @@ TEST(ProbDistributionsLogistic, opencl_sigma_mu_scalar) {
                                                 mu, sigma);
 }
 
+TEST(ProbDistributionsLogistic, opencl_matches_cpu_tails) {
+  Eigen::VectorXd y(12);
+  y << -1599.5, -79.5, -59.5, -39.5, -1.5, 0.5, 2.5, 40.5, 60.5, 74.5, 80.5,
+      1600.5;
+  Eigen::VectorXd mu = Eigen::VectorXd::Constant(12, 0.5);
+  Eigen::VectorXd sigma = Eigen::VectorXd::Constant(12, 2.0);
+  stan::math::test::compare_cpu_opencl_prim_rev(logistic_lpdf_functor, y, mu,
+                                                sigma);
+
+  Eigen::VectorXd y_far(2);
+  y_far << 801.0, -799.0;
+  Eigen::VectorXd mu_far(2);
+  mu_far << 800.0, -800.0;
+  stan::math::test::compare_cpu_opencl_prim_rev(logistic_lpdf_functor, y_far,
+                                                mu_far, 1.0);
+}
 #endif

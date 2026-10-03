@@ -158,4 +158,13 @@ TEST(ProbDistributionsLogisticLcdf, opencl_matches_cpu_big) {
       logistic_lcdf_functor, y.transpose().eval(), mu.transpose().eval(),
       sigma.transpose().eval());
 }
+TEST(ProbDistributionsLogisticLcdf, opencl_matches_cpu_tails) {
+  Eigen::VectorXd y(12);
+  y << -1599.5, -79.5, -59.5, -39.5, -1.5, 0.5, 2.5, 40.5, 60.5, 74.5, 80.5,
+      1600.5;
+  Eigen::VectorXd mu = Eigen::VectorXd::Constant(12, 0.5);
+  Eigen::VectorXd sigma = Eigen::VectorXd::Constant(12, 2.0);
+  stan::math::test::compare_cpu_opencl_prim_rev(logistic_lcdf_functor, y, mu,
+                                                sigma);
+}
 #endif
