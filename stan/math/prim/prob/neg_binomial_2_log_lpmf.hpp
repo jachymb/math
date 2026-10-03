@@ -79,16 +79,21 @@ inline return_type_t<T_log_location, T_precision> neg_binomial_2_log_lpmf(
 
   VectorBuilder<is_any_autodiff_v<T_log_location, T_precision>,
                 T_partials_return, T_log_location, T_precision>
-      s(size_eta_phi), one_m_s(size_eta_phi);
+      s(size_eta_phi);
+  VectorBuilder<is_autodiff_v<T_precision>, T_partials_return, T_log_location,
+                T_precision>
+      one_m_s(size_eta_phi);
   if constexpr (is_any_autodiff_v<T_log_location, T_precision>) {
     // s = inv_logit(eta - log(phi)) and 1 - s, without exp(eta)
     for (size_t i = 0; i < size_eta_phi; ++i) {
       const bool pos = eta_val[i] > log_phi[i];
       const T_partials_return e
           = exp(pos ? log_phi[i] - eta_val[i] : eta_val[i] - log_phi[i]);
-      const T_partials_return inv_1pe = inv(1 + e);
-      s[i] = pos ? inv_1pe : e * inv_1pe;
-      one_m_s[i] = pos ? e * inv_1pe : inv_1pe;
+      const T_partials_return one_p_e = 1 + e;
+      s[i] = pos ? inv(one_p_e) : e / one_p_e;
+      if constexpr (is_autodiff_v<T_precision>) {
+        one_m_s[i] = pos ? e / one_p_e : inv(one_p_e);
+      }
     }
   }
 
