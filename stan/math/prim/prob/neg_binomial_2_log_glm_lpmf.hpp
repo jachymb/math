@@ -10,7 +10,6 @@
 #include <stan/math/prim/fun/exp.hpp>
 #include <stan/math/prim/fun/lgamma.hpp>
 #include <stan/math/prim/fun/log.hpp>
-#include <stan/math/prim/fun/log1p_exp.hpp>
 #include <stan/math/prim/fun/multiply_log.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
 #include <stan/math/prim/fun/size.hpp>
@@ -147,10 +146,12 @@ neg_binomial_2_log_glm_lpmf(const T_y& y, const T_x& x, const T_alpha& alpha,
   }
   check_finite(function, "Matrix of independent variables", theta);
   T_precision_val log_phi = log(phi_arr);
+  // e = exp(-|theta - log(phi)|) gives log(exp(theta) + phi) and
+  // inv_logit(+-(theta - log(phi)))
+  Array<T_partials_return, Dynamic, 1> e
+      = (theta > log_phi).select(log_phi - theta, theta - log_phi).exp();
   Array<T_partials_return, Dynamic, 1> logsumexp_theta_logphi
-      = (theta > log_phi)
-            .select(theta + log1p_exp(log_phi - theta),
-                    log_phi + log1p_exp(theta - log_phi));
+      = (theta > log_phi).select(theta, log_phi) + e.log1p();
 
   T_sum_val y_plus_phi = y_arr + phi_arr;
 
@@ -190,9 +191,6 @@ neg_binomial_2_log_glm_lpmf(const T_y& y, const T_x& x, const T_alpha& alpha,
   auto ops_partials
       = make_partials_propagator(x_ref, alpha_ref, beta_ref, phi_ref);
   if constexpr (is_any_autodiff_v<T_x, T_beta, T_alpha, T_precision>) {
-    // e = exp(-|theta - log(phi)|) gives inv_logit(+-(theta - log(phi)))
-    Array<T_partials_return, Dynamic, 1> e
-        = (theta > log_phi).select(log_phi - theta, theta - log_phi).exp();
     Array<T_partials_return, Dynamic, 1> one_p_e = 1 + e;
     if constexpr (is_any_autodiff_v<T_x, T_beta, T_alpha>) {
       Matrix<T_partials_return, Dynamic, 1> theta_derivative
