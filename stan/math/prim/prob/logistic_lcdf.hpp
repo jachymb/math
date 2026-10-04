@@ -6,11 +6,10 @@
 #include <stan/math/prim/fun/abs.hpp>
 #include <stan/math/prim/fun/as_value_column_array_or_scalar.hpp>
 #include <stan/math/prim/fun/constants.hpp>
-#include <stan/math/prim/fun/exp.hpp>
 #include <stan/math/prim/fun/inv.hpp>
 #include <stan/math/prim/fun/inv_logit.hpp>
 #include <stan/math/prim/fun/log.hpp>
-#include <stan/math/prim/fun/log1p.hpp>
+#include <stan/math/prim/fun/log1p_exp.hpp>
 #include <stan/math/prim/fun/sum.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
 #include <stan/math/prim/fun/select.hpp>
@@ -18,9 +17,19 @@
 #include <stan/math/prim/fun/size_zero.hpp>
 #include <stan/math/prim/fun/to_ref.hpp>
 #include <stan/math/prim/functor/partials_propagator.hpp>
+#include <cmath>
 
 namespace stan {
 namespace math {
+namespace internal {
+// log(inv_logit(t)); for t < 1, log(1 + exp(-|t|)) is within 3 ulp and cheaper
+inline double std_logistic_lcdf(double t) {
+  if (t < 1) {
+    return (t < 0 ? t : 0.0) - std::log(1 + std::exp(t < 0 ? t : -t));
+  }
+  return 0.0 - std::log1p(std::exp(-t));  // +0 at t = inf
+}
+}  // namespace internal
 
 template <typename T_y, typename T_loc, typename T_scale,
           require_all_not_nonscalar_prim_or_rev_kernel_expression_t<
@@ -64,19 +73,14 @@ inline return_type_t<T_y, T_loc, T_scale> logistic_lcdf(const T_y& y,
       = to_ref_if<is_any_autodiff_v<T_y, T_loc, T_scale>>(inv(sigma_val));
   const auto& z = to_ref_if<is_any_autodiff_v<T_y, T_loc, T_scale>>(
       (y_val - mu_val) * inv_sigma);
-  // log(inv_logit(t)) = min(t, 0) - log1p(exp(-|t|)), +0 at t = inf;
-  // for t < 1, log(1 + exp(-|t|)) is within 3 ulp and cheaper
-  const auto log_inv_logit_t = [](const auto& t) {
-    if (t < 1) {
-      return (t < 0 ? t : 0.0) - log(1 + exp(t < 0 ? t : -t));
-    }
-    return 0.0 - log1p(exp(-t));
-  };
   T_partials_return P;
-  if constexpr (is_eigen<std::decay_t<decltype(z)>>::value) {
-    P = sum(z.unaryExpr(log_inv_logit_t));
+  if constexpr (is_autodiff_v<T_partials_return>) {
+    P = 0.0 - sum(log1p_exp(-z));  // +0, not -0, at y = inf
+  } else if constexpr (is_eigen<std::decay_t<decltype(z)>>::value) {
+    P = sum(
+        z.unaryExpr([](double t) { return internal::std_logistic_lcdf(t); }));
   } else {
-    P = log_inv_logit_t(z);
+    P = internal::std_logistic_lcdf(z);
   }
 
   if constexpr (is_any_autodiff_v<T_y, T_loc, T_scale>) {
