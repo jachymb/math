@@ -120,6 +120,26 @@ constexpr double d2y[] = {0.0,
                           -1.0620885638228972e-18,
                           0.0};
 
+// log(inv_logit(t)) and its first and second derivatives at t = 0, 0.5,
+// 1 - 2^-53, 1 and 1 + 2^-52 (formula switches of the double lcdf and
+// lccdf); same source.
+struct log_inv_logit_ref {
+  double t;
+  double val;
+  double d1;
+  double d2;
+};
+
+constexpr log_inv_logit_ref switch_points[] = {
+    {0.0, -0.6931471805599453, 0.5, -0.25},
+    {0.5, -0.4740769841801067, 0.37754066879814546, -0.2350037122015945},
+    {0.9999999999999999, -0.31326168751822286, 0.26894142136999516,
+     -0.19661193324148185},
+    {1.0, -0.3132616875182228, 0.2689414213699951, -0.19661193324148185},
+    {1.0000000000000002, -0.31326168751822275, 0.2689414213699951,
+     -0.19661193324148182},
+};
+
 }  // namespace logistic_tail_refs
 
 #endif

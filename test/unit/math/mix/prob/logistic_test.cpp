@@ -3,6 +3,7 @@
 #include <test/unit/math/mix/prob/logistic_tail_refs.hpp>
 #include <gtest/gtest.h>
 #include <cmath>
+#include <iterator>
 #include <limits>
 #include <string>
 #include <vector>
@@ -64,6 +65,17 @@ void expect_fvar_refs(const F& f, const logistic_ref (&refs)[N]) {
     expect_rel(r.dy, lp_y.d_, msg);
     expect_rel(r.dmu, lp_mu.d_, msg);
     expect_rel(r.dsigma, lp_sigma.d_, msg);
+  }
+}
+
+// Values with all arguments double: y a scalar, then a one-element vector.
+template <typename F, size_t N>
+void expect_double_refs(const F& f, const logistic_ref (&refs)[N]) {
+  for (const auto& r : refs) {
+    const std::string msg = "z = " + std::to_string(r.z);
+    const double y = mu + sigma * r.z;
+    expect_rel(r.val, f(y, mu, sigma), msg);
+    expect_rel(r.val, f(std::vector<double>{y}, mu, sigma), msg);
   }
 }
 
@@ -250,6 +262,8 @@ TEST_F(AgradRev, mathMixScalFun_logistic_cdf_tails) {
   using stan::math::var;
   logistic_test::expect_var_refs(logistic_test::cdf, logistic_tail_refs::cdf);
   logistic_test::expect_fvar_refs(logistic_test::cdf, logistic_tail_refs::cdf);
+  logistic_test::expect_double_refs(logistic_test::cdf,
+                                    logistic_tail_refs::cdf);
 
   // The product of the cdfs underflows to 0 with z = -800 included: the value
   // and all partials are 0.
@@ -285,10 +299,32 @@ TEST_F(AgradRev, mathMixScalFun_logistic_cdf_tails) {
   }
 }
 
+TEST_F(AgradRev, mathMixScalFun_logistic_cdf_subnormal_product) {
+  using stan::math::var;
+  // 24 elements at z = -30: the cdf is exp(-720), subnormal (mpmath at 60
+  // digits); its y partials equal it to double precision
+  const double p_ref = 2.0322308024e-313;
+  std::vector<var> y;
+  for (int i = 0; i < 24; ++i) {
+    y.push_back(-30.0);
+  }
+  var p = stan::math::logistic_cdf(y, 0.0, 1.0);
+  p.grad();
+  logistic_test::expect_rel(p_ref, p.val(), "value");
+  for (const auto& y_i : y) {
+    logistic_test::expect_rel(p_ref, y_i.adj(), "y");
+  }
+  logistic_test::expect_rel(
+      p_ref, stan::math::logistic_cdf(std::vector<double>(24, -30.0), 0.0, 1.0),
+      "double");
+}
+
 TEST_F(AgradRev, mathMixScalFun_logistic_lcdf_tails) {
   logistic_test::expect_var_refs(logistic_test::lcdf, logistic_tail_refs::lcdf);
   logistic_test::expect_fvar_refs(logistic_test::lcdf,
                                   logistic_tail_refs::lcdf);
+  logistic_test::expect_double_refs(logistic_test::lcdf,
+                                    logistic_tail_refs::lcdf);
   logistic_test::expect_vector_refs(logistic_test::lcdf,
                                     logistic_tail_refs::lcdf);
 }
@@ -308,6 +344,8 @@ TEST_F(AgradRev, mathMixScalFun_logistic_lccdf_tails) {
                                  logistic_tail_refs::lccdf);
   logistic_test::expect_fvar_refs(logistic_test::lccdf,
                                   logistic_tail_refs::lccdf);
+  logistic_test::expect_double_refs(logistic_test::lccdf,
+                                    logistic_tail_refs::lccdf);
   logistic_test::expect_vector_refs(logistic_test::lccdf,
                                     logistic_tail_refs::lccdf);
 }
@@ -377,4 +415,50 @@ TEST_F(AgradRev, mathMixScalFun_logistic_infinite_z) {
   expect(logistic_test::lcdf, 1e308, 0);
   expect(logistic_test::lccdf, -1e308, 0);
   expect(logistic_test::lccdf, 1e308, -inf);
+}
+
+TEST_F(AgradRev, mathMixScalFun_logistic_lcdf_lccdf_switch_points) {
+  using logistic_tail_refs::switch_points;
+  using stan::math::fvar;
+  using stan::math::var;
+  // lcdf at y = t and lccdf at y = -t (mu = 0, sigma = 1) are
+  // log(inv_logit(t)): the value, its own derivative and the partials
+  for (size_t i = 0; i < std::size(switch_points); ++i) {
+    const auto& r = switch_points[i];
+    for (double sign : {1.0, -1.0}) {
+      auto f = [sign](const auto& y) {
+        return sign > 0 ? stan::math::logistic_lcdf(y, 0.0, 1.0)
+                        : stan::math::logistic_lccdf(y, 0.0, 1.0);
+      };
+      const double y = sign * r.t;
+      const double d1 = sign * r.d1;
+      const std::string msg
+          = (sign > 0 ? "lcdf, point " : "lccdf, point ") + std::to_string(i);
+      logistic_test::expect_rel(r.val, f(y), msg, 1e-13);
+      logistic_test::expect_rel(r.val, f(std::vector<double>{y}), msg, 1e-13);
+
+      var y_v = y;
+      var lp = f(y_v);
+      lp.grad();
+      logistic_test::expect_rel(r.val, lp.val(), msg, 1e-13);
+      logistic_test::expect_rel(d1, y_v.adj(), msg, 1e-13);
+      stan::math::recover_memory();
+
+      fvar<fvar<double>> y_ff(fvar<double>(y, 1), fvar<double>(1, 0));
+      fvar<fvar<double>> lp_ff = f(y_ff);
+      logistic_test::expect_rel(r.val, lp_ff.val_.val_, msg, 1e-13);
+      logistic_test::expect_rel(d1, lp_ff.val_.d_, msg, 1e-13);
+      logistic_test::expect_rel(d1, lp_ff.d_.val_, msg, 1e-13);
+      logistic_test::expect_rel(r.d2, lp_ff.d_.d_, msg, 1e-13);
+
+      fvar<var> y_fv(y, 1);
+      fvar<var> lp_fv = f(y_fv);
+      lp_fv.val_.grad();
+      logistic_test::expect_rel(d1, y_fv.val_.adj(), msg, 1e-13);
+      stan::math::set_zero_all_adjoints();
+      lp_fv.d_.grad();
+      logistic_test::expect_rel(r.d2, y_fv.val_.adj(), msg, 1e-13);
+      stan::math::recover_memory();
+    }
+  }
 }
