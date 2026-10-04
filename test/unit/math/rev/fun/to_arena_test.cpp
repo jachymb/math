@@ -84,15 +84,16 @@ TEST_F(AgradRev, Rev_to_arena_rvalue_matrix_test) {
   EXPECT_MATRIX_EQ(expected, b_arena);
 
   // an lvalue is copied and left unchanged
+  n_moved = moved.size();
   Eigen::VectorXd c = expected;
   auto c_arena = stan::math::to_arena(c);
   EXPECT_NE(c.data(), c_arena.data());
-  EXPECT_EQ(n_moved + 2, moved.size());
+  EXPECT_EQ(n_moved, moved.size());
   EXPECT_MATRIX_EQ(expected, c);
   EXPECT_MATRIX_EQ(expected, c_arena);
 
   // an empty rvalue is moved as well
   auto e_arena = stan::math::to_arena(Eigen::VectorXd());
   EXPECT_EQ(0, e_arena.size());
-  EXPECT_EQ(n_moved + 3, moved.size());
+  EXPECT_EQ(n_moved + 1, moved.size());
 }
