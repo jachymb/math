@@ -15,6 +15,7 @@
 #include <stan/math/prim/fun/size_zero.hpp>
 #include <stan/math/prim/fun/to_ref.hpp>
 #include <stan/math/prim/functor/partials_propagator.hpp>
+#include <cmath>
 
 namespace stan {
 namespace math {
@@ -60,8 +61,17 @@ inline return_type_t<T_y, T_loc, T_scale> logistic_cdf(const T_y& y,
 
   const auto& inv_sigma
       = to_ref_if<is_any_autodiff_v<T_y, T_loc, T_scale>>(inv(sigma_val));
-  const auto& z = to_ref((y_val - mu_val) * inv_sigma);
-  const T_partials_return P = prod(inv_logit(z));
+  const auto& z = to_ref_if<is_any_autodiff_v<T_y, T_loc, T_scale>>(
+      (y_val - mu_val) * inv_sigma);
+  T_partials_return P;
+  if constexpr (std::is_arithmetic<T_partials_return>::value
+                && is_eigen<std::decay_t<decltype(z)>>::value) {
+    // one division; exp(-z) = inf is harmless off the tape; scalar libm exp
+    P = 1.0
+        / (1.0 + (-z).unaryExpr([](double t) { return std::exp(t); })).prod();
+  } else {
+    P = prod(inv_logit(z));
+  }
 
   if constexpr (is_any_autodiff_v<T_y, T_loc, T_scale>) {
     // d/dz inv_logit(z) = inv_logit(z) inv_logit(-z)
