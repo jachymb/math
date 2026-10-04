@@ -64,11 +64,14 @@ inline return_type_t<T_y, T_loc, T_scale> logistic_cdf(const T_y& y,
   const auto& z = to_ref_if<is_any_autodiff_v<T_y, T_loc, T_scale>>(
       (y_val - mu_val) * inv_sigma);
   T_partials_return P;
-  if constexpr (std::is_arithmetic<T_partials_return>::value
-                && is_eigen<std::decay_t<decltype(z)>>::value) {
+  if constexpr (is_eigen<std::decay_t<decltype(z)>>::value
+                && !is_autodiff_v<T_partials_return>) {
     // one division; exp(-z) = inf is harmless off the tape; scalar libm exp
     P = 1.0
         / (1.0 + (-z).unaryExpr([](double t) { return std::exp(t); })).prod();
+    if (P == 0) {  // 1 / inf, but the product of the cdfs can be subnormal
+      P = prod(inv_logit(z));
+    }
   } else {
     P = prod(inv_logit(z));
   }
