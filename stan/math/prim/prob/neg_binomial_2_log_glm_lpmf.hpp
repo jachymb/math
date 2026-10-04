@@ -146,8 +146,7 @@ neg_binomial_2_log_glm_lpmf(const T_y& y, const T_x& x, const T_alpha& alpha,
   }
   check_finite(function, "Matrix of independent variables", theta);
   T_precision_val log_phi = log(phi_arr);
-  // e = exp(-|theta - log(phi)|) gives log(exp(theta) + phi) and
-  // inv_logit(+-(theta - log(phi)))
+  // e = exp(-|theta - log(phi)|) for log(exp(theta) + phi) and the partials
   Array<T_partials_return, Dynamic, 1> e
       = (theta > log_phi).select(log_phi - theta, theta - log_phi).exp();
   Array<T_partials_return, Dynamic, 1> logsumexp_theta_logphi
