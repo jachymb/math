@@ -1,9 +1,11 @@
 #ifndef TEST_UNIT_MATH_PRIM_PROB_HPP
 #define TEST_UNIT_MATH_PRIM_PROB_HPP
 
+#include <stan/math/prim/fun/Eigen.hpp>
 #include <boost/math/distributions.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 /**
@@ -81,5 +83,18 @@ inline void assert_matches_quantiles(const std::vector<double>& samples,
     proportions.push_back(1.0 / K);
 
   assert_matches_bins(samples, quantiles, proportions, tolerance);
+}
+
+/**
+ * Return the sample correlation of two equally long sequences. Useful for
+ * testing that the elements of a vectorized RNG call are independent.
+ */
+inline double sample_correlation(const std::vector<double>& x,
+                                 const std::vector<double>& y) {
+  Eigen::Map<const Eigen::ArrayXd> x_arr(x.data(), x.size());
+  Eigen::Map<const Eigen::ArrayXd> y_arr(y.data(), y.size());
+  Eigen::ArrayXd x_c = x_arr - x_arr.mean();
+  Eigen::ArrayXd y_c = y_arr - y_arr.mean();
+  return (x_c * y_c).sum() / std::sqrt(x_c.square().sum() * y_c.square().sum());
 }
 #endif

@@ -7,12 +7,37 @@
 #include <stan/math/prim/fun/max_size.hpp>
 #include <stan/math/prim/fun/size_zero.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
-#include <boost/random/gamma_distribution.hpp>
-#include <boost/random/poisson_distribution.hpp>
-#include <boost/random/variate_generator.hpp>
+#include <stan/math/prim/prob/gamma_rng.hpp>
+#include <stan/math/prim/prob/poisson_rng.hpp>
 
 namespace stan {
 namespace math {
+
+namespace internal {
+
+/**
+ * Return a negative binomial random variate as a Poisson draw whose rate is
+ * drawn from the gamma distribution with the specified shape and scale.
+ *
+ * @tparam RNG type of random number generator
+ * @param function name of the calling function, for error messages
+ * @param shape positive finite shape of the gamma distribution
+ * @param scale scale of the gamma distribution
+ * @param rng random number generator
+ * @return negative binomial random variate
+ * @throw std::domain_error if the drawn rate is not less than
+ * `POISSON_MAX_RATE`, so that the draw may not fit in an `int`, or is NaN
+ */
+template <typename RNG>
+inline int gamma_poisson_draw(const char* function, double shape, double scale,
+                              RNG& rng) {
+  double lambda = gamma_draw(shape, rng) * scale;
+  check_less(function, "Poisson rate drawn from the gamma distribution", lambda,
+             POISSON_MAX_RATE);
+  return poisson_draw(lambda, rng);
+}
+
+}  // namespace internal
 
 /** \ingroup prob_dists
  * Return a negative binomial random variate with the specified shape and
@@ -28,16 +53,14 @@ namespace math {
  * @param beta (Sequence of) positive inverse scale parameter(s)
  * @param rng random number generator
  * @return (Sequence of) negative binomial random variate(s)
- * @throw std::domain_error if alpha or beta are nonpositive
+ * @throw std::domain_error if alpha or beta are nonpositive, or if a Poisson
+ * rate drawn from the gamma distribution is not less than `POISSON_MAX_RATE`
  * @throw std::invalid_argument if non-scalar arguments are of different
  * sizes
  */
 template <typename T_shape, typename T_inv, class RNG>
 inline typename VectorBuilder<true, int, T_shape, T_inv>::type neg_binomial_rng(
     const T_shape& alpha, const T_inv& beta, RNG& rng) {
-  using boost::gamma_distribution;
-  using boost::variate_generator;
-  using boost::random::poisson_distribution;
   using T_alpha_ref = ref_type_t<T_shape>;
   using T_beta_ref = ref_type_t<T_inv>;
   static constexpr const char* function = "neg_binomial_rng";
@@ -59,20 +82,8 @@ inline typename VectorBuilder<true, int, T_shape, T_inv>::type neg_binomial_rng(
   VectorBuilder<true, int, T_shape, T_inv> output(N);
 
   for (size_t n = 0; n < N; ++n) {
-    double rng_from_gamma = variate_generator<RNG&, gamma_distribution<> >(
-        rng, gamma_distribution<>(alpha_vec[n], 1.0 / beta_vec[n]))();
-
-    // same as the constraints for poisson_rng
-    check_less(function, "Random number that came from gamma distribution",
-               rng_from_gamma, POISSON_MAX_RATE);
-    check_not_nan(function, "Random number that came from gamma distribution",
-                  rng_from_gamma);
-    check_nonnegative(function,
-                      "Random number that came from gamma distribution",
-                      rng_from_gamma);
-
-    output[n] = variate_generator<RNG&, poisson_distribution<> >(
-        rng, poisson_distribution<>(rng_from_gamma))();
+    output[n] = internal::gamma_poisson_draw(function, alpha_vec[n],
+                                             1.0 / beta_vec[n], rng);
   }
 
   return output.data();

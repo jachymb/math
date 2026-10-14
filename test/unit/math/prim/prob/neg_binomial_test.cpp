@@ -57,8 +57,8 @@ TEST(ProbDistributionsNegBinomial, error_check) {
 
   std::string error_msg;
   error_msg
-      = "neg_binomial_rng: Random number that "
-        "came from gamma distribution is";
+      = "neg_binomial_rng: Poisson rate drawn from the "
+        "gamma distribution is";
   try {
     stan::math::neg_binomial_rng(1e10, 1, rng);
     FAIL() << "neg_binomial_rng should have thrown" << std::endl;
@@ -238,5 +238,14 @@ TEST(ProbDistributionsNegBinomial, poissonCutoff) {
           << " value at cutoff - 1e-8: " << before_cutoff
           << ", value at cutoff + 1e-8: " << after_cutoff;
     }
+  }
+}
+
+TEST(ProbDistributionsNegBinomial, rngLargeMean) {
+  // About 23% of the gamma draws exceed 2^30 here, which used to throw
+  // although the Poisson draw fits in an int
+  boost::random::mt19937 rng;
+  for (int i = 0; i < 100; ++i) {
+    ASSERT_NO_THROW(stan::math::neg_binomial_rng(100, 1e-7, rng));
   }
 }

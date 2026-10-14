@@ -11,7 +11,7 @@ class PoissonTestRig : public VectorIntRNGTestRig {
  public:
   PoissonTestRig()
       : VectorIntRNGTestRig(10000, 10, {0, 1, 2, 3, 4, 5, 6}, {0.1, 1.1, 4.99},
-                            {1, 2, 3}, {-3.0, -2.0, 0.0}, {-3, -1, 0}) {}
+                            {1, 2, 3}, {-3.0, -2.0, -0.5}, {-3, -2, -1}) {}
 
   template <typename T1, typename T2, typename T3, typename T_rng>
   auto generate_samples(const T1& lambda, const T2&, const T3&,
@@ -129,4 +129,20 @@ TEST(ProbDistributionsPoisson, chiSquareGoodnessFitTest2) {
     chi += ((bin[j] - expect[j]) * (bin[j] - expect[j]) / expect[j]);
 
   EXPECT_TRUE(chi < quantile(complement(mydist, 1e-6)));
+}
+
+TEST(ProbDistributionsPoisson, rngRateBelowIntOverflowCap) {
+  // Rates below 2^31 - 2^21 produce a draw above INT_MAX with probability
+  // below e^-1000
+  boost::random::mt19937 rng;
+  EXPECT_NO_THROW(stan::math::poisson_rng(2e9, rng));
+  EXPECT_NO_THROW(stan::math::poisson_log_rng(std::log(2e9), rng));
+}
+
+TEST(ProbDistributionsPoisson, rngZeroRate) {
+  // poisson_lpmf accepts a zero rate (a point mass at 0), so poisson_rng does
+  // too; exp(-746) underflows to a zero rate
+  boost::random::mt19937 rng;
+  EXPECT_EQ(0, stan::math::poisson_rng(0.0, rng));
+  EXPECT_EQ(0, stan::math::poisson_log_rng(-746.0, rng));
 }

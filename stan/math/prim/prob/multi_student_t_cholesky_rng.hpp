@@ -76,8 +76,8 @@ multi_student_t_cholesky_rng(double nu, const T_loc& mu,
   variate_generator<RNG&, normal_distribution<> > std_normal_rng(
       rng, normal_distribution<>(0, 1));
 
-  double w = inv_gamma_rng(nu / 2, nu / 2, rng);
   for (size_t n = 0; n < N; ++n) {
+    double w = inv_gamma_rng(nu / 2, nu / 2, rng);
     Eigen::VectorXd z(L.cols());
     for (int i = 0; i < L.cols(); i++) {
       z(i) = std_normal_rng();

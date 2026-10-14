@@ -56,8 +56,8 @@ TEST(ProbDistributionsNegBinomial2Log, error_check) {
   }
 
   error_msg
-      = "neg_binomial_2_log_rng: Random number that "
-        "came from gamma distribution is";
+      = "neg_binomial_2_log_rng: Poisson rate drawn from the "
+        "gamma distribution is";
   try {
     stan::math::neg_binomial_2_log_rng(log(1e10), 1e20, rng);
     FAIL() << "neg_binomial_2_log_rng should have thrown" << std::endl;
@@ -205,4 +205,19 @@ TEST(ProbDistributionsNegBinomial2Log, neg_binomial_2_log_grid_test) {
       }
     }
   }
+}
+
+TEST(ProbDistributionsNegBinomial2Log, rngLargeMean) {
+  // About 23% of the gamma draws exceed 2^30 here, which used to throw
+  // although the Poisson draw fits in an int
+  boost::random::mt19937 rng;
+  for (int i = 0; i < 100; ++i) {
+    ASSERT_NO_THROW(
+        stan::math::neg_binomial_2_log_rng(std::log(1e9), 100, rng));
+  }
+}
+
+TEST(ProbDistributionsNegBinomial2Log, rngRateUnderflow) {
+  boost::random::mt19937 rng;
+  EXPECT_EQ(0, stan::math::neg_binomial_2_log_rng(-746.0, 1, rng));
 }

@@ -84,3 +84,9 @@ TEST(ProbDistributionsScaledInvChiSquare, chiSquareGoodnessFitTest) {
   // Assert that they match
   assert_matches_quantiles(samples, quantiles, 1e-6);
 }
+
+TEST(ProbDistributionsScaledInvChiSquare, rngIntArguments) {
+  // nu * s * s used to be computed in int arithmetic and overflow
+  boost::random::mt19937 rng;
+  EXPECT_GT(stan::math::scaled_inv_chi_square_rng(3, 30000, rng), 0);
+}

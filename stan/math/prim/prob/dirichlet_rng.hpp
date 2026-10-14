@@ -2,11 +2,12 @@
 #define STAN_MATH_PRIM_PROB_DIRICHLET_RNG_HPP
 
 #include <stan/math/prim/meta.hpp>
+#include <stan/math/prim/err.hpp>
 #include <stan/math/prim/fun/exp.hpp>
 #include <stan/math/prim/fun/log.hpp>
 #include <stan/math/prim/fun/log_sum_exp.hpp>
+#include <stan/math/prim/prob/gamma_rng.hpp>
 #include <boost/math/special_functions/gamma.hpp>
-#include <boost/random/gamma_distribution.hpp>
 #include <boost/random/uniform_real_distribution.hpp>
 #include <boost/random/variate_generator.hpp>
 #include <cmath>
@@ -34,16 +35,18 @@ namespace math {
  * @tparam RNG type of pseudo-random number generator
  * @param alpha Prior count (plus 1) parameter for Dirichlet.
  * @param rng Pseudo-random number generator.
+ * @throw std::domain_error if any element of alpha is nonpositive or not
+ * finite
  */
 template <class RNG>
 inline Eigen::VectorXd dirichlet_rng(
     const Eigen::Matrix<double, Eigen::Dynamic, 1>& alpha, RNG& rng) {
-  using boost::gamma_distribution;
   using boost::variate_generator;
   using boost::random::uniform_real_distribution;
   using Eigen::VectorXd;
   using std::exp;
   using std::log;
+  check_positive_finite("dirichlet_rng", "prior sample sizes", alpha);
 
   // separate algorithm if any parameter is less than 1
   if (alpha.minCoeff() < 1) {
@@ -51,10 +54,9 @@ inline Eigen::VectorXd dirichlet_rng(
         rng, uniform_real_distribution<>(0.0, 1.0));
     VectorXd log_y(alpha.size());
     for (int i = 0; i < alpha.size(); ++i) {
-      variate_generator<RNG&, gamma_distribution<> > gamma_rng(
-          rng, gamma_distribution<>(alpha(i) + 1, 1));
       double log_u = log(uniform_rng());
-      log_y(i) = log(gamma_rng()) + log_u / alpha(i);
+      log_y(i)
+          = log(internal::gamma_draw(alpha(i) + 1, rng)) + log_u / alpha(i);
     }
     double log_sum_y = log_sum_exp(log_y);
     VectorXd theta(alpha.size());
@@ -67,9 +69,7 @@ inline Eigen::VectorXd dirichlet_rng(
   // standard normalized gamma algorithm
   Eigen::VectorXd y(alpha.rows());
   for (int i = 0; i < alpha.rows(); i++) {
-    variate_generator<RNG&, gamma_distribution<> > gamma_rng(
-        rng, gamma_distribution<>(alpha(i, 0), 1e-7));
-    y(i) = gamma_rng();
+    y(i) = internal::gamma_draw(alpha(i, 0), rng) * 1e-7;
   }
   return y / y.sum();
 }

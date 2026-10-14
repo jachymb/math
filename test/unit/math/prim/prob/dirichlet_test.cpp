@@ -222,3 +222,14 @@ TEST(ProbDistributionsDirichlet, random) {
   beta << 0.001, 0.0001, 1e-10;
   EXPECT_NO_THROW(stan::math::dirichlet_rng(beta, rng));
 }
+
+TEST(ProbDistributions, DirichletRngInvalidAlpha) {
+  // dirichlet_rng used to return NaN or arbitrary values for these
+  boost::random::mt19937 rng;
+  Eigen::VectorXd alpha(2);
+  for (double bad : {stan::math::positive_infinity(),
+                     stan::math::not_a_number(), 0.0, -1.0}) {
+    alpha << 2.0, bad;
+    EXPECT_THROW(stan::math::dirichlet_rng(alpha, rng), std::domain_error);
+  }
+}

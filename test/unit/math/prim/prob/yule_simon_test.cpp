@@ -52,3 +52,13 @@ TEST(ProbDistributionsYuleSimon, error_check) {
   EXPECT_THROW(stan::math::yule_simon_rng(stan::math::not_a_number(), rng),
                std::domain_error);
 }
+
+TEST(ProbDistributionsYuleSimon, rngLargeShape) {
+  // About 5% of the exponential draws w are so small here that p = exp(-w)
+  // rounds to 1, which used to make the odds ratio p / (1 - p) infinite and
+  // throw
+  boost::random::mt19937 rng;
+  for (int i = 0; i < 200; ++i) {
+    ASSERT_NO_THROW(stan::math::yule_simon_rng(1e15, rng));
+  }
+}

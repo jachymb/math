@@ -2,8 +2,11 @@
 #define STAN_MATH_PRIM_PROB_BETA_BINOMIAL_RNG_HPP
 
 #include <stan/math/prim/meta.hpp>
+#include <stan/math/prim/err.hpp>
 #include <stan/math/prim/prob/binomial_rng.hpp>
 #include <stan/math/prim/prob/beta_rng.hpp>
+#include <stan/math/prim/fun/max_size.hpp>
+#include <stan/math/prim/fun/scalar_seq_view.hpp>
 #include <stan/math/prim/fun/size_zero.hpp>
 
 namespace stan {
@@ -37,7 +40,8 @@ beta_binomial_rng(const T_N &N, const T_shape1 &alpha, const T_shape2 &beta,
   using T_alpha_ref = ref_type_t<T_shape1>;
   using T_beta_ref = ref_type_t<T_shape2>;
   static constexpr const char *function = "beta_binomial_rng";
-  check_consistent_sizes(function, "First prior sample size parameter", alpha,
+  check_consistent_sizes(function, "Population size parameter", N,
+                         "First prior sample size parameter", alpha,
                          "Second prior sample size parameter", beta);
 
   if (size_zero(N, alpha, beta)) {
@@ -53,8 +57,16 @@ beta_binomial_rng(const T_N &N, const T_shape1 &alpha, const T_shape2 &beta,
   check_positive_finite(function, "Second prior sample size parameter",
                         beta_ref);
 
-  auto p = beta_rng(alpha_ref, beta_ref, rng);
-  return binomial_rng(N_ref, p, rng);
+  // One beta draw per element, also where N is a vector and alpha and beta
+  // are scalars
+  scalar_seq_view<T_alpha_ref> alpha_vec(alpha_ref);
+  scalar_seq_view<T_beta_ref> beta_vec(beta_ref);
+  size_t size_p = max_size(N, alpha, beta);
+  VectorBuilder<true, double, T_N, T_shape1, T_shape2> p(size_p);
+  for (size_t n = 0; n < size_p; ++n) {
+    p[n] = beta_rng(alpha_vec[n], beta_vec[n], rng);
+  }
+  return binomial_rng(N_ref, p.data(), rng);
 }
 
 }  // namespace math

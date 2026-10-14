@@ -3,6 +3,7 @@
 #include <test/unit/math/prim/prob/VectorIntRNGTestRig.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/math/distributions.hpp>
+#include <test/unit/math/prim/prob/util.hpp>
 #include <gtest/gtest.h>
 #include <limits>
 #include <vector>
@@ -55,4 +56,19 @@ TEST(ProbDistributionBetaBinomial, error_check) {
   EXPECT_THROW(stan::math::beta_binomial_rng(
                    4, 0.6, stan::math::positive_infinity(), rng),
                std::domain_error);
+}
+
+TEST(ProbDistributionBetaBinomial, rngVectorDrawsIndependent) {
+  // All elements used to share one beta draw, which made their correlation
+  // 0.83 for these parameters
+  boost::random::mt19937 rng;
+  std::vector<int> N(2, 20);
+  std::vector<double> y0;
+  std::vector<double> y1;
+  for (int i = 0; i < 10000; ++i) {
+    std::vector<int> y = stan::math::beta_binomial_rng(N, 2.0, 2.0, rng);
+    y0.push_back(y[0]);
+    y1.push_back(y[1]);
+  }
+  EXPECT_NEAR(0, sample_correlation(y0, y1), 0.1);
 }

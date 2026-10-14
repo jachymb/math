@@ -188,9 +188,12 @@ static constexpr double HALF_LOG_TWO = 0.5 * LOG_TWO;
 static constexpr double NEG_LOG_SQRT_TWO_PI = -HALF_LOG_TWO_PI;
 
 /**
- * Largest rate parameter allowed in Poisson RNG
+ * Upper bound (exclusive) on the rate of a Poisson draw in the RNGs,
+ * \f$ 2^{31} - 2^{21} \f$. It lies \f$ 2^{21} \f$, or 45 standard
+ * deviations, below \f$ 2^{31} \f$, so a draw with a smaller rate exceeds
+ * the largest 32-bit `int` with probability below \f$ e^{-1000} \f$.
  */
-const double POISSON_MAX_RATE = std::pow(2.0, 30);
+static constexpr double POISSON_MAX_RATE = 2147483648.0 - 2097152.0;
 
 /**
  * Return positive infinity.

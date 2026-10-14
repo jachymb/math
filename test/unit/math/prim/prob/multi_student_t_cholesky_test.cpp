@@ -1,4 +1,5 @@
 #include <stan/math/prim.hpp>
+#include <test/unit/math/prim/prob/util.hpp>
 #include <gtest/gtest.h>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/math/distributions.hpp>
@@ -494,4 +495,21 @@ TEST(ProbDistributionsMultiStudentTCholesky, WrongSize) {
                std::invalid_argument);
   EXPECT_THROW(stan::math::multi_student_t_cholesky_lpdf(y_3_2, nu, mu_3_3, L),
                std::invalid_argument);
+}
+
+TEST(ProbDistributionsMultiStudentTCholesky, rngVectorDrawsIndependent) {
+  // All locations used to share one inverse gamma draw: the draws were
+  // uncorrelated but dependent, with corr(log|y_1|, log|y_2|) = 0.5 at nu = 1
+  boost::random::mt19937 rng;
+  std::vector<Eigen::VectorXd> mu(2, Eigen::VectorXd::Zero(1));
+  Eigen::MatrixXd S = Eigen::MatrixXd::Identity(1, 1);
+  std::vector<double> y0;
+  std::vector<double> y1;
+  for (int i = 0; i < 10000; ++i) {
+    std::vector<Eigen::VectorXd> y
+        = stan::math::multi_student_t_cholesky_rng(1.0, mu, S, rng);
+    y0.push_back(std::log(std::fabs(y[0](0))));
+    y1.push_back(std::log(std::fabs(y[1](0))));
+  }
+  EXPECT_NEAR(0, sample_correlation(y0, y1), 0.1);
 }

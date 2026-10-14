@@ -6,8 +6,9 @@
 #include <stan/math/prim/fun/max_size.hpp>
 #include <stan/math/prim/fun/size_zero.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
-#include <boost/random/student_t_distribution.hpp>
-#include <boost/random/variate_generator.hpp>
+#include <stan/math/prim/prob/gamma_rng.hpp>
+#include <boost/random/normal_distribution.hpp>
+#include <cmath>
 
 namespace stan {
 namespace math {
@@ -41,8 +42,6 @@ student_t_rng(const T_deg& nu, const T_loc& mu, const T_scale& sigma,
   using T_nu_ref = ref_type_t<T_deg>;
   using T_mu_ref = ref_type_t<T_loc>;
   using T_sigma_ref = ref_type_t<T_scale>;
-  using boost::variate_generator;
-  using boost::random::student_t_distribution;
   static constexpr const char* function = "student_t_rng";
   check_consistent_sizes(function, "Degrees of freedom parameter", nu,
                          "Location parameter", mu, "Scale Parameter", sigma);
@@ -62,10 +61,14 @@ student_t_rng(const T_deg& nu, const T_loc& mu, const T_scale& sigma,
   size_t N = max_size(nu, mu, sigma);
   VectorBuilder<true, double, T_deg, T_loc, T_scale> output(N);
 
+  boost::random::normal_distribution<> std_normal;
   for (size_t n = 0; n < N; ++n) {
-    variate_generator<RNG&, student_t_distribution<> > rng_unit_student_t(
-        rng, student_t_distribution<>(nu_vec[n]));
-    output[n] = mu_vec[n] + sigma_vec[n] * rng_unit_student_t();
+    // Boost's student_t_distribution, with the chi-square draw routed
+    // through internal::gamma_draw
+    double z = std_normal(rng);
+    double chi_square = 2 * internal::gamma_draw(nu_vec[n] / 2.0, rng);
+    output[n]
+        = mu_vec[n] + sigma_vec[n] * (z / std::sqrt(chi_square / nu_vec[n]));
   }
 
   return output.data();

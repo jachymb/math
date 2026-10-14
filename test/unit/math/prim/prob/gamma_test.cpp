@@ -80,3 +80,26 @@ TEST(ProbDistributionGamma, chiSquareGoodnessFitTest) {
   // Assert that they match
   assert_matches_quantiles(samples, quantiles, 1e-6);
 }
+
+TEST(ProbDistributionGamma, rngLargeShape) {
+  // Boost's sampler spreads the draws 2.8 times too wide at shape 1e18. At
+  // these shapes the standardized gamma distribution is normal up to its
+  // skewness 2 / sqrt(alpha), far below what 10000 draws can detect.
+  boost::random::mt19937 rng;
+  int N = 10000;
+  int K = stan::math::round(2 * std::pow(N, 0.4));
+  boost::math::normal_distribution<> std_normal;
+  std::vector<double> quantiles;
+  for (int i = 1; i < K; ++i) {
+    quantiles.push_back(quantile(std_normal, static_cast<double>(i) / K));
+  }
+  quantiles.push_back(std::numeric_limits<double>::max());
+  for (double alpha : {1e10, 1e18}) {
+    std::vector<double> samples;
+    for (int i = 0; i < N; ++i) {
+      samples.push_back((stan::math::gamma_rng(alpha, 1.0, rng) - alpha)
+                        / std::sqrt(alpha));
+    }
+    assert_matches_quantiles(samples, quantiles, 1e-6);
+  }
+}

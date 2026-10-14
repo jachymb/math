@@ -7,8 +7,7 @@
 #include <stan/math/prim/fun/size_zero.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
 #include <stan/math/prim/fun/to_ref.hpp>
-#include <boost/random/chi_squared_distribution.hpp>
-#include <boost/random/variate_generator.hpp>
+#include <stan/math/prim/prob/gamma_rng.hpp>
 
 namespace stan {
 namespace math {
@@ -35,8 +34,6 @@ namespace math {
 template <typename T_deg, typename T_scale, class RNG>
 inline typename VectorBuilder<true, double, T_deg, T_scale>::type
 scaled_inv_chi_square_rng(const T_deg& nu, const T_scale& s, RNG& rng) {
-  using boost::variate_generator;
-  using boost::random::chi_squared_distribution;
   static constexpr const char* function = "scaled_inv_chi_square_rng";
   check_consistent_sizes(function, "Location parameter", nu, "Scale Parameter",
                          s);
@@ -54,9 +51,9 @@ scaled_inv_chi_square_rng(const T_deg& nu, const T_scale& s, RNG& rng) {
   VectorBuilder<true, double, T_deg, T_scale> output(N);
 
   for (size_t n = 0; n < N; ++n) {
-    variate_generator<RNG&, chi_squared_distribution<> > chi_square_rng(
-        rng, chi_squared_distribution<>(nu_vec[n]));
-    output[n] = nu_vec[n] * s_vec[n] * s_vec[n] / chi_square_rng();
+    // In double: nu * s * s overflows for int arguments such as (3, 30000)
+    output[n] = static_cast<double>(nu_vec[n]) * s_vec[n] * s_vec[n]
+                / (2 * internal::gamma_draw(nu_vec[n] / 2.0, rng));
   }
 
   return output.data();

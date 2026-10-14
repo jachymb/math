@@ -7,7 +7,7 @@
 #include <stan/math/prim/fun/max_size.hpp>
 #include <stan/math/prim/fun/size_zero.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
-#include <boost/random/gamma_distribution.hpp>
+#include <stan/math/prim/prob/gamma_rng.hpp>
 #include <boost/random/uniform_real_distribution.hpp>
 #include <boost/random/variate_generator.hpp>
 #include <cmath>
@@ -37,7 +37,6 @@ template <typename T_shape1, typename T_shape2, class RNG>
 inline typename VectorBuilder<true, double, T_shape1, T_shape2>::type beta_rng(
     const T_shape1 &alpha, const T_shape2 &beta, RNG &rng) {
   using boost::variate_generator;
-  using boost::random::gamma_distribution;
   using boost::random::uniform_real_distribution;
   using T_alpha_ref = ref_type_t<T_shape1>;
   using T_beta_ref = ref_type_t<T_shape2>;
@@ -65,22 +64,14 @@ inline typename VectorBuilder<true, double, T_shape1, T_shape2>::type beta_rng(
     // method for generating beta random variables. If any parameter
     // is small, work in log space and use Marsaglia and Tsang's trick
     if (alpha_vec[n] > 1.0 && beta_vec[n] > 1.0) {
-      variate_generator<RNG &, gamma_distribution<>> rng_gamma_alpha(
-          rng, gamma_distribution<>(alpha_vec[n], 1.0));
-      variate_generator<RNG &, gamma_distribution<>> rng_gamma_beta(
-          rng, gamma_distribution<>(beta_vec[n], 1.0));
-      double a = rng_gamma_alpha();
-      double b = rng_gamma_beta();
+      double a = internal::gamma_draw(alpha_vec[n], rng);
+      double b = internal::gamma_draw(beta_vec[n], rng);
       output[n] = a / (a + b);
     } else {
-      variate_generator<RNG &, gamma_distribution<>> rng_gamma_alpha(
-          rng, gamma_distribution<>(alpha_vec[n] + 1, 1.0));
-      variate_generator<RNG &, gamma_distribution<>> rng_gamma_beta(
-          rng, gamma_distribution<>(beta_vec[n] + 1, 1.0));
       double log_a = std::log(uniform_rng()) / alpha_vec[n]
-                     + std::log(rng_gamma_alpha());
-      double log_b
-          = std::log(uniform_rng()) / beta_vec[n] + std::log(rng_gamma_beta());
+                     + std::log(internal::gamma_draw(alpha_vec[n] + 1, rng));
+      double log_b = std::log(uniform_rng()) / beta_vec[n]
+                     + std::log(internal::gamma_draw(beta_vec[n] + 1, rng));
       double log_sum = log_sum_exp(log_a, log_b);
       output[n] = std::exp(log_a - log_sum);
     }

@@ -3,13 +3,10 @@
 
 #include <stan/math/prim/meta.hpp>
 #include <stan/math/prim/err.hpp>
-#include <stan/math/prim/fun/constants.hpp>
 #include <stan/math/prim/fun/max_size.hpp>
 #include <stan/math/prim/fun/size_zero.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
-#include <boost/random/gamma_distribution.hpp>
-#include <boost/random/poisson_distribution.hpp>
-#include <boost/random/variate_generator.hpp>
+#include <stan/math/prim/prob/neg_binomial_rng.hpp>
 #include <cmath>
 
 namespace stan {
@@ -29,16 +26,15 @@ namespace math {
  * @param phi (Sequence of) positive inverse dispersion parameter(s)
  * @param rng random number generator
  * @return (Sequence of) negative binomial random variate(s)
- * @throw std::domain_error if eta is non-finite or phi is nonpositive
+ * @throw std::domain_error if eta is non-finite or phi is nonpositive, or if
+ * a Poisson rate drawn from the gamma distribution is not less than
+ * `POISSON_MAX_RATE`
  * @throw std::invalid_argument if non-scalar arguments are of different
  * sizes
  */
 template <typename T_loc, typename T_inv, class RNG>
 inline typename VectorBuilder<true, int, T_loc, T_inv>::type
 neg_binomial_2_log_rng(const T_loc& eta, const T_inv& phi, RNG& rng) {
-  using boost::gamma_distribution;
-  using boost::variate_generator;
-  using boost::random::poisson_distribution;
   using T_eta_ref = ref_type_t<T_loc>;
   using T_phi_ref = ref_type_t<T_inv>;
   static constexpr const char* function = "neg_binomial_2_log_rng";
@@ -61,26 +57,14 @@ neg_binomial_2_log_rng(const T_loc& eta, const T_inv& phi, RNG& rng) {
     double exp_eta_div_phi
         = std::exp(static_cast<double>(eta_vec[n])) / phi_vec[n];
 
-    // gamma_rng params must be positive and finite
-    check_positive_finite(function,
-                          "Exponential of the log-location parameter "
-                          "divided by the precision parameter",
-                          exp_eta_div_phi);
+    // An underflow to 0 is fine: the draw is then 0
+    check_finite(function,
+                 "Exponential of the log-location parameter "
+                 "divided by the precision parameter",
+                 exp_eta_div_phi);
 
-    double rng_from_gamma = variate_generator<RNG&, gamma_distribution<> >(
-        rng, gamma_distribution<>(phi_vec[n], exp_eta_div_phi))();
-
-    // same as the constraints for poisson_rng
-    check_less(function, "Random number that came from gamma distribution",
-               rng_from_gamma, POISSON_MAX_RATE);
-    check_not_nan(function, "Random number that came from gamma distribution",
-                  rng_from_gamma);
-    check_nonnegative(function,
-                      "Random number that came from gamma distribution",
-                      rng_from_gamma);
-
-    output[n] = variate_generator<RNG&, poisson_distribution<> >(
-        rng, poisson_distribution<>(rng_from_gamma))();
+    output[n] = internal::gamma_poisson_draw(function, phi_vec[n],
+                                             exp_eta_div_phi, rng);
   }
 
   return output.data();

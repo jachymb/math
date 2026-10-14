@@ -3,12 +3,10 @@
 
 #include <stan/math/prim/meta.hpp>
 #include <stan/math/prim/err.hpp>
-#include <stan/math/prim/fun/constants.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
 #include <stan/math/prim/fun/size.hpp>
 #include <stan/math/prim/fun/to_ref.hpp>
-#include <boost/random/poisson_distribution.hpp>
-#include <boost/random/variate_generator.hpp>
+#include <stan/math/prim/prob/poisson_rng.hpp>
 #include <cmath>
 
 namespace stan {
@@ -25,15 +23,15 @@ namespace math {
  * @param alpha (Sequence of) log rate parameter(s)
  * @param rng random number generator
  * @return (Sequence of) Poisson random variate(s)
- * @throw std::domain_error if alpha is nonfinite
+ * @throw std::domain_error if alpha is nonfinite or not less than
+ * \f$ \log(2^{31} - 2^{21}) \f$
  */
 template <typename T_rate, class RNG>
 inline typename VectorBuilder<true, int, T_rate>::type poisson_log_rng(
     const T_rate& alpha, RNG& rng) {
-  using boost::variate_generator;
-  using boost::random::poisson_distribution;
   static constexpr const char* function = "poisson_log_rng";
-  static constexpr double POISSON_MAX_LOG_RATE = 30 * LOG_TWO;
+  // log(POISSON_MAX_RATE)
+  static constexpr double POISSON_MAX_LOG_RATE = 21.486585557710477;
   const auto& alpha_ref = to_ref(alpha);
   check_finite(function, "Log rate parameter", alpha_ref);
   check_less(function, "Log rate parameter", alpha_ref, POISSON_MAX_LOG_RATE);
@@ -43,9 +41,7 @@ inline typename VectorBuilder<true, int, T_rate>::type poisson_log_rng(
   VectorBuilder<true, int, T_rate> output(N);
 
   for (size_t n = 0; n < N; ++n) {
-    variate_generator<RNG&, poisson_distribution<> > poisson_rng(
-        rng, poisson_distribution<>(std::exp(alpha_vec[n])));
-    output[n] = poisson_rng();
+    output[n] = internal::poisson_draw(std::exp(alpha_vec[n]), rng);
   }
 
   return output.data();
