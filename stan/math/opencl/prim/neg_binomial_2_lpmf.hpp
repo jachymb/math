@@ -10,7 +10,7 @@
 #include <stan/math/prim/fun/exp.hpp>
 #include <stan/math/opencl/kernel_generator.hpp>
 #include <stan/math/prim/functor/partials_propagator.hpp>
-#include <stan/math/prim/fun/multiply_log.hpp>
+#include <stan/math/prim/fun/lmultiply.hpp>
 
 namespace stan {
 namespace math {
@@ -85,7 +85,7 @@ inline return_type_t<T_n_cl, T_location_cl, T_precision_cl> neg_binomial_2_lpmf(
       logp1 + binomial_coefficient_log(n_plus_phi - 1, n), logp1);
   auto logp_expr = colwise_sum(
       static_select<include_summand<propto, T_location_cl>::value>(
-          logp2 + multiply_log(n, mu_val), logp2));
+          logp2 + lmultiply(n, mu_val), logp2));
 
   auto mu_deriv = elt_divide(n, mu_val) - elt_divide(n + phi_val, mu_plus_phi);
   auto log_term

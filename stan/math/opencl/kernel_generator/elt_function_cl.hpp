@@ -22,7 +22,6 @@
 #include <stan/math/opencl/kernels/device_functions/log1m_inv_logit.hpp>
 #include <stan/math/opencl/kernels/device_functions/log1p_exp.hpp>
 #include <stan/math/opencl/kernels/device_functions/logit.hpp>
-#include <stan/math/opencl/kernels/device_functions/multiply_log.hpp>
 #include <stan/math/opencl/kernels/device_functions/Phi.hpp>
 #include <stan/math/opencl/kernels/device_functions/Phi_approx.hpp>
 #include <stan/math/opencl/kernels/device_functions/std_normal_lcdf.hpp>
@@ -417,8 +416,6 @@ ADD_BINARY_FUNCTION_WITH_INCLUDES(
 ADD_BINARY_FUNCTION_WITH_INCLUDES(log_diff_exp,
                                   opencl_kernels::log1m_exp_device_function,
                                   opencl_kernels::log_diff_exp_device_function)
-ADD_BINARY_FUNCTION_WITH_INCLUDES(
-    multiply_log, stan::math::opencl_kernels::multiply_log_device_function)
 ADD_BINARY_FUNCTION_WITH_INCLUDES(
     lmultiply, stan::math::opencl_kernels::lmultiply_device_function)
 

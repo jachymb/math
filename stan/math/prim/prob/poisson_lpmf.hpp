@@ -10,7 +10,7 @@
 #include <stan/math/prim/fun/is_inf.hpp>
 #include <stan/math/prim/fun/lgamma.hpp>
 #include <stan/math/prim/fun/max_size.hpp>
-#include <stan/math/prim/fun/multiply_log.hpp>
+#include <stan/math/prim/fun/lmultiply.hpp>
 #include <stan/math/prim/fun/promote_scalar.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
 #include <stan/math/prim/fun/size.hpp>
@@ -66,7 +66,7 @@ inline return_type_t<T_rate> poisson_lpmf(const T_n& n, const T_rate& lambda) {
 
   auto ops_partials = make_partials_propagator(lambda_ref);
 
-  T_partials_return logp = stan::math::sum(multiply_log(n_val, lambda_val));
+  T_partials_return logp = stan::math::sum(lmultiply(n_val, lambda_val));
   if constexpr (include_summand<propto, T_rate>::value) {
     logp -= sum(lambda_val) * N / math::size(lambda);
   }

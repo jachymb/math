@@ -61,7 +61,7 @@ inline return_type_t<T_rate_cl> poisson_lpmf(const T_n_cl& n,
   auto return_log_zero = colwise_max(
       cast<char>(isinf(lambda_val) || (lambda_val == 0 && n != 0)));
 
-  auto logp1 = multiply_log(n, lambda_val);
+  auto logp1 = lmultiply(n, lambda_val);
   auto logp2 = static_select<include_summand<propto, T_rate_cl>::value>(
       logp1 - lambda_val, logp1);
   auto logp_expr = colwise_sum(static_select<include_summand<propto>::value>(

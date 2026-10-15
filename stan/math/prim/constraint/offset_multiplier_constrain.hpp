@@ -5,7 +5,7 @@
 #include <stan/math/prim/err.hpp>
 #include <stan/math/prim/fun/fma.hpp>
 #include <stan/math/prim/constraint/identity_constrain.hpp>
-#include <stan/math/prim/fun/multiply_log.hpp>
+#include <stan/math/prim/fun/lmultiply.hpp>
 #include <stan/math/prim/fun/size.hpp>
 #include <stan/math/prim/fun/sum.hpp>
 #include <stan/math/prim/fun/to_ref.hpp>
@@ -111,7 +111,7 @@ inline auto offset_multiplier_constrain(const T& x, const M& mu, const S& sigma,
   check_positive_finite("offset_multiplier_constrain", "multiplier",
                         value_of_rec(sigma_ref));
   if (math::size(sigma_ref) == 1) {
-    lp += sum(multiply_log(math::size(x), sigma_ref));
+    lp += sum(lmultiply(math::size(x), sigma_ref));
   } else {
     lp += sum(log(sigma_ref));
   }

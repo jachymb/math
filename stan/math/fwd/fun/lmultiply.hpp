@@ -10,15 +10,24 @@
 namespace stan {
 namespace math {
 
+// The term x1 * x2.d_ / x2.val_ of the tangent is dropped only when it is
+// 0/0: it is 0 whenever x1 is 0, but for a nested T it still carries the
+// derivative x2.d_ / x2.val_ with respect to x1, which must be kept. A single
+// return with a conditional term, rather than an early return, lets the
+// compiler share the log(x2) of the value and of the tangent for T = double.
 template <typename T>
 inline fvar<T> lmultiply(const fvar<T>& x1, const fvar<T>& x2) {
-  return fvar<T>(lmultiply(x1.val_, x2.val_),
-                 x1.d_ * log(x2.val_) + x1.val_ * x2.d_ / x2.val_);
+  const bool both_zero = x1.val_ == 0.0 && x2.val_ == 0.0;
+  return fvar<T>(
+      lmultiply(x1.val_, x2.val_),
+      x1.d_ * log(x2.val_) + (both_zero ? T(0.0) : x1.val_ * x2.d_ / x2.val_));
 }
 
 template <typename T>
 inline fvar<T> lmultiply(double x1, const fvar<T>& x2) {
-  return fvar<T>(lmultiply(x1, x2.val_), x1 * x2.d_ / x2.val_);
+  const bool both_zero = x1 == 0.0 && x2.val_ == 0.0;
+  return fvar<T>(lmultiply(x1, x2.val_),
+                 both_zero ? T(0.0) : x1 * x2.d_ / x2.val_);
 }
 
 template <typename T>

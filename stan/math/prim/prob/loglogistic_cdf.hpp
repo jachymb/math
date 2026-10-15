@@ -8,6 +8,7 @@
 #include <stan/math/prim/fun/as_value_column_array_or_scalar.hpp>
 #include <stan/math/prim/fun/exp.hpp>
 #include <stan/math/prim/fun/log.hpp>
+#include <stan/math/prim/fun/lmultiply.hpp>
 #include <stan/math/prim/fun/max_size.hpp>
 #include <stan/math/prim/fun/size.hpp>
 #include <stan/math/prim/fun/size_zero.hpp>
@@ -110,7 +111,7 @@ inline return_type_t<T_y, T_scale, T_shape> loglogistic_cdf(
     }
     if constexpr (is_autodiff_v<T_shape>) {
       const auto& beta_deriv
-          = -multiply_log(alpha_div_y_pow_beta, alpha_div_y) * prod_all_sq;
+          = -lmultiply(alpha_div_y_pow_beta, alpha_div_y) * prod_all_sq;
       partials<2>(ops_partials) = beta_deriv * cdf_div_elt;
     }
   }
