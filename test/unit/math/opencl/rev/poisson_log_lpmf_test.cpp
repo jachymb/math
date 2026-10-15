@@ -3,6 +3,7 @@
 #include <stan/math.hpp>
 #include <gtest/gtest.h>
 #include <test/unit/math/opencl/util.hpp>
+#include <limits>
 #include <vector>
 
 TEST(ProbDistributionsPoissonLog, error_checking) {
@@ -106,6 +107,23 @@ TEST(ProbDistributionsPoissonLog, opencl_matches_cpu_big) {
                                                 alpha.transpose().eval());
   stan::math::test::compare_cpu_opencl_prim_rev(poisson_log_lpmf_functor_propto,
                                                 n, alpha.transpose().eval());
+}
+
+TEST(ProbDistributionsPoissonLog, opencl_zero_rate) {
+  std::vector<int> n{0, 2};
+  Eigen::VectorXd alpha(2);
+  alpha << -std::numeric_limits<double>::infinity(), 0;
+  stan::math::matrix_cl<int> n_cl(n);
+  stan::math::var_value<stan::math::matrix_cl<double>> alpha_cl
+      = stan::math::to_matrix_cl(alpha);
+  stan::math::var lp = stan::math::poisson_log_lpmf(n_cl, alpha_cl);
+  lp.grad();
+  // log p(0 | 0) + log p(2 | 1) = -1 - log(2); derivatives n - exp(alpha)
+  EXPECT_FLOAT_EQ(-1 - std::log(2.0), lp.val());
+  Eigen::VectorXd adj = stan::math::from_matrix_cl(alpha_cl.adj());
+  EXPECT_FLOAT_EQ(0, adj(0));
+  EXPECT_FLOAT_EQ(1, adj(1));
+  stan::math::recover_memory();
 }
 
 #endif

@@ -105,4 +105,21 @@ TEST(ProbDistributionsPoisson, opencl_matches_cpu_big) {
                                                 alpha.transpose().eval());
 }
 
+TEST(ProbDistributionsPoisson, opencl_zero_rate) {
+  std::vector<int> n{0, 2};
+  Eigen::VectorXd lambda(2);
+  lambda << 0, 1;
+  stan::math::matrix_cl<int> n_cl(n);
+  stan::math::var_value<stan::math::matrix_cl<double>> lambda_cl
+      = stan::math::to_matrix_cl(lambda);
+  stan::math::var lp = stan::math::poisson_lpmf(n_cl, lambda_cl);
+  lp.grad();
+  // log p(0 | 0) + log p(2 | 1) = -1 - log(2); derivatives n / lambda - 1
+  EXPECT_FLOAT_EQ(-1 - std::log(2.0), lp.val());
+  Eigen::VectorXd adj = stan::math::from_matrix_cl(lambda_cl.adj());
+  EXPECT_FLOAT_EQ(-1, adj(0));
+  EXPECT_FLOAT_EQ(1, adj(1));
+  stan::math::recover_memory();
+}
+
 #endif

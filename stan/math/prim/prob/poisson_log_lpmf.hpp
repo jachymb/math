@@ -12,6 +12,7 @@
 #include <stan/math/prim/fun/max_size.hpp>
 #include <stan/math/prim/fun/promote_scalar.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
+#include <stan/math/prim/fun/select.hpp>
 #include <stan/math/prim/fun/size.hpp>
 #include <stan/math/prim/fun/size_zero.hpp>
 #include <stan/math/prim/fun/to_ref.hpp>
@@ -69,7 +70,8 @@ inline return_type_t<T_log_rate> poisson_log_lpmf(const T_n& n,
 
   const auto& exp_alpha = to_ref_if<is_autodiff_v<T_log_rate>>(exp(alpha_val));
 
-  T_partials_return logp = sum(n_val * alpha_val);
+  // n alpha is 0 for n = 0, also where alpha = -inf (a zero rate)
+  T_partials_return logp = sum(n_val * select(n_val == 0, 0.0, alpha_val));
   if constexpr (include_summand<propto, T_log_rate>::value) {
     logp -= sum(exp_alpha) * N / math::size(alpha);
   }

@@ -63,7 +63,8 @@ inline return_type_t<T_log_rate_cl> poisson_log_lpmf(
       = colwise_max(cast<char>(isinf(alpha_val) && (alpha_val > 0 || n != 0)));
   auto exp_alpha = exp(alpha_val);
 
-  auto logp1 = elt_multiply(n, alpha_val);
+  // n alpha is 0 for n = 0, also where alpha = -inf (a zero rate)
+  auto logp1 = elt_multiply(n, select(n == 0, 0.0, alpha_val));
   auto logp2 = static_select<include_summand<propto, T_log_rate_cl>::value>(
       logp1 - exp_alpha, logp1);
   auto logp_expr = colwise_sum(static_select<include_summand<propto>::value>(

@@ -9,13 +9,15 @@
 #include <stan/math/prim/fun/constants.hpp>
 #include <stan/math/prim/fun/is_inf.hpp>
 #include <stan/math/prim/fun/lgamma.hpp>
+#include <stan/math/prim/fun/lmultiply.hpp>
 #include <stan/math/prim/fun/max_size.hpp>
-#include <stan/math/prim/fun/multiply_log.hpp>
 #include <stan/math/prim/fun/promote_scalar.hpp>
 #include <stan/math/prim/fun/scalar_seq_view.hpp>
+#include <stan/math/prim/fun/select.hpp>
 #include <stan/math/prim/fun/size.hpp>
 #include <stan/math/prim/fun/size_zero.hpp>
 #include <stan/math/prim/fun/sum.hpp>
+#include <stan/math/prim/fun/to_ref.hpp>
 #include <stan/math/prim/fun/value_of.hpp>
 #include <stan/math/prim/functor/partials_propagator.hpp>
 
@@ -66,7 +68,11 @@ inline return_type_t<T_rate> poisson_lpmf(const T_n& n, const T_rate& lambda) {
 
   auto ops_partials = make_partials_propagator(lambda_ref);
 
-  T_partials_return logp = stan::math::sum(multiply_log(n_val, lambda_val));
+  // lambda = 0 is valid only for n = 0, where n log(lambda) and its
+  // derivative n / lambda are 0: use rate 1 there to keep 0 / 0 off the tape
+  const auto& lambda_nz = to_ref_if<is_autodiff_v<T_partials_return>>(
+      select(n_val == 0, 1.0, lambda_val));
+  T_partials_return logp = stan::math::sum(lmultiply(n_val, lambda_nz));
   if constexpr (include_summand<propto, T_rate>::value) {
     logp -= sum(lambda_val) * N / math::size(lambda);
   }
@@ -75,7 +81,7 @@ inline return_type_t<T_rate> poisson_lpmf(const T_n& n, const T_rate& lambda) {
   }
 
   if constexpr (is_autodiff_v<T_rate>) {
-    partials<0>(ops_partials) = n_val / lambda_val - 1.0;
+    partials<0>(ops_partials) = n_val / lambda_nz - 1.0;
   }
 
   return ops_partials.build(logp);
