@@ -65,6 +65,9 @@
 #include <stan/math/prim/prob/chi_square_lcdf.hpp>
 #include <stan/math/prim/prob/chi_square_lpdf.hpp>
 #include <stan/math/prim/prob/chi_square_rng.hpp>
+#include <stan/math/prim/prob/complex_uniform_lcdf.hpp>
+#include <stan/math/prim/prob/complex_uniform_lpdf.hpp>
+#include <stan/math/prim/prob/complex_uniform_rng.hpp>
 #include <stan/math/prim/prob/dirichlet_lpdf.hpp>
 #include <stan/math/prim/prob/dirichlet_rng.hpp>
 #include <stan/math/prim/prob/dirichlet_multinomial_lpmf.hpp>
