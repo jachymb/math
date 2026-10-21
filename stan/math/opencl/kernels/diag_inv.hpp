@@ -52,7 +52,8 @@ static constexpr const char* diag_inv_kernel_code = STRINGIFY(
       // The following code is the sequential version of forward
       // substitution with the identity matrix as RHS. Only the innermost loops
       // are parallelized. The rows are processed sequentially. This loop
-      // process all the rows:
+      // process all the rows. Each work item reads and writes only its own
+      // column of tmp_inv and only reads A, so the loop needs no barrier:
       for (int k = 0; k < block_size; k++) {
         double diag_ele = A(A_offset + k, A_offset + k);
 
@@ -63,14 +64,12 @@ static constexpr const char* diag_inv_kernel_code = STRINGIFY(
         if (index <= k) {
           tmp_inv[tmp_offset + k] /= diag_ele;
         }
-        barrier(CLK_LOCAL_MEM_FENCE);
         // Each thread updates one column in the RHS matrix
         // (ignores values above the diagonal).
         for (int i = max(k + 1, index); i < block_size; i++) {  // NOLINT
           double factor = A(A_offset + i, A_offset + k);
           tmp_inv[tmp_offset + i] -= tmp_inv[tmp_offset + k] * factor;
         }
-        barrier(CLK_LOCAL_MEM_FENCE);
       }
       // The copy below overwrites entries of A that other work items read
       // above, so a global memory fence separates the two.
