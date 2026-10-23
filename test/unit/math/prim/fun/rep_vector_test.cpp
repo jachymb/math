@@ -10,3 +10,12 @@ TEST(MathMatrixPrimMat, rep_vector) {
 
   EXPECT_THROW(rep_vector(2.0, -1), std::domain_error);
 }
+
+TEST(MathMatrixPrimMat, rep_vector_complex) {
+  std::complex<double> z(1.5, -2.5);
+  Eigen::VectorXcd x = stan::math::rep_vector(z, 3);
+  EXPECT_EQ(3, x.size());
+  for (int i = 0; i < x.size(); ++i) {
+    EXPECT_EQ(z, x(i));
+  }
+}

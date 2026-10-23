@@ -59,3 +59,27 @@ TEST(MathMatrixPrimMat, dims) {
   EXPECT_EQ(7, dims8[1]);
   EXPECT_EQ(8, dims8[2]);
 }
+
+TEST(MathMatrixPrimMat, dims_complex) {
+  using stan::math::dims;
+  using std::vector;
+  std::complex<double> z(1.5, -2.0);
+  EXPECT_EQ(vector<int>{}, dims(z));
+
+  Eigen::VectorXcd v(3);
+  Eigen::RowVectorXcd rv(2);
+  Eigen::MatrixXcd m(2, 3);
+  EXPECT_EQ((vector<int>{3, 1}), dims(v));
+  EXPECT_EQ((vector<int>{1, 2}), dims(rv));
+  EXPECT_EQ((vector<int>{2, 3}), dims(m));
+
+  EXPECT_EQ(vector<int>{4}, dims(vector<std::complex<double> >(4, z)));
+  EXPECT_EQ((vector<int>{2, 3, 1}), dims(vector<Eigen::VectorXcd>(2, v)));
+  EXPECT_EQ((vector<int>{3, 1, 2}), dims(vector<Eigen::RowVectorXcd>(3, rv)));
+  EXPECT_EQ((vector<int>{2, 2, 3}), dims(vector<Eigen::MatrixXcd>(2, m)));
+  vector<vector<std::complex<double> > > zz(
+      3, vector<std::complex<double> >(2, z));
+  EXPECT_EQ((vector<int>{3, 2}), dims(zz));
+  vector<vector<Eigen::MatrixXcd> > mm(4, vector<Eigen::MatrixXcd>(2, m));
+  EXPECT_EQ((vector<int>{4, 2, 2, 3}), dims(mm));
+}

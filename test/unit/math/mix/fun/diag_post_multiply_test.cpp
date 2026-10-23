@@ -82,3 +82,19 @@ TEST(MathMixMatFun, diagPostMultiply) {
   // non-square error: mismatched sizes
   expect_diag_post_multiply(b23, u2);
 }
+
+TEST(MathMixMatFun, diagPostMultiplyComplex) {
+  using cd = std::complex<double>;
+  auto f = [](const auto& x, const auto& y) {
+    return stan::math::diag_post_multiply(x, y);
+  };
+
+  Eigen::MatrixXcd a(2, 3);
+  a << cd(1, -1), cd(0.5, 2), cd(-2, 1), cd(3, 0.25), cd(-1, -2), cd(2, 3);
+  Eigen::VectorXcd v(3);
+  v << cd(1, 2), cd(-0.5, 1.5), cd(3, -1);
+  Eigen::RowVectorXcd rv(3);
+  rv << cd(2, -1), cd(0.25, 0.75), cd(-1, 0.5);
+  stan::test::expect_ad(f, a, v);
+  stan::test::expect_ad(f, a, rv);
+}

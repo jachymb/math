@@ -76,3 +76,20 @@ TEST(MathMixMatFun, mdivideRight) {
   // exceptions: wrong types
   stan::test::expect_ad(f, v3, m33);
 }
+
+TEST(MathMixMatFun, mdivideRightComplex) {
+  using cd = std::complex<double>;
+  auto f = [](const auto& x, const auto& y) {
+    return stan::math::mdivide_right(x, y);
+  };
+
+  // well-conditioned (diagonally dominant) complex matrix
+  Eigen::MatrixXcd a(2, 2);
+  a << cd(3, 1), cd(1, -0.5), cd(0.5, 2), cd(4, -1);
+  Eigen::MatrixXcd b(3, 2);
+  b << cd(1, -1), cd(0.5, 2), cd(-2, 1), cd(3, 0.25), cd(-1, -2), cd(2, 3);
+  Eigen::RowVectorXcd rv(2);
+  rv << cd(2, -1), cd(0.25, 0.75);
+  stan::test::expect_ad(f, rv, a);
+  stan::test::expect_ad(f, b, a);
+}

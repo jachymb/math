@@ -32,3 +32,12 @@ TEST(MathMixMatFun, trace) {
   stan::test::expect_ad(f, h);
   stan::test::expect_ad_matvar(f, h);
 }
+
+TEST(MathMixMatFun, traceComplex) {
+  using c_t = std::complex<double>;
+  auto f = [](const auto& x) { return stan::math::trace(x); };
+
+  Eigen::MatrixXcd m(2, 2);
+  m << c_t(1.1, 0.3), c_t(-0.5, 1.2), c_t(0.8, -1.4), c_t(-1.3, -0.9);
+  stan::test::expect_ad(f, m);
+}

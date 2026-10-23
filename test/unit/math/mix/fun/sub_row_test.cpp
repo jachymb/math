@@ -30,3 +30,12 @@ TEST(MathMixMatFun, subRow) {
   stan::test::expect_ad(f(1, 1, 0), c);
   stan::test::expect_ad(f(1, 1, 1), c);
 }
+
+TEST(MathMixMatFun, subRowComplex) {
+  using c_t = std::complex<double>;
+  auto f = [](const auto& y) { return stan::math::sub_row(y, 2, 2, 2); };
+  Eigen::MatrixXcd m(2, 3);
+  m << c_t(1.5, -2.1), c_t(-3.2, 0.7), c_t(0.4, 2.9), c_t(2.2, 1.1),
+      c_t(-0.6, -1.8), c_t(3.3, -0.9);
+  stan::test::expect_ad(f, m);
+}

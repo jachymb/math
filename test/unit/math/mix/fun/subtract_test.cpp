@@ -162,3 +162,35 @@ TEST(MathMixMatFun, subtract_throw) {
   m11 << 1;
   stan::test::expect_ad(f, m11, m22);
 }
+
+TEST(MathMixMatFun, subtractComplex) {
+  using c_t = std::complex<double>;
+  auto f
+      = [](const auto& x, const auto& y) { return stan::math::subtract(x, y); };
+
+  c_t z1(1.5, -0.5);
+  c_t z2(-0.8, 1.2);
+  Eigen::VectorXcd v1(2);
+  v1 << c_t(0.5, 1.2), c_t(-1.3, 0.4);
+  Eigen::VectorXcd v2(2);
+  v2 << c_t(2.1, -0.7), c_t(0.3, 1.9);
+  Eigen::RowVectorXcd rv1(2);
+  rv1 << c_t(1.1, -0.6), c_t(-0.4, 2.2);
+  Eigen::RowVectorXcd rv2(2);
+  rv2 << c_t(0.7, 0.9), c_t(-1.6, -0.3);
+  Eigen::MatrixXcd m1(2, 2);
+  m1 << c_t(1, -0.5), c_t(0.25, 2), c_t(-1.5, 0.75), c_t(2.5, -1);
+  Eigen::MatrixXcd m2(2, 2);
+  m2 << c_t(0.6, 1.4), c_t(-2, 0.3), c_t(1.2, -0.9), c_t(-0.7, -1.8);
+
+  stan::test::expect_ad(f, z1, z2);
+  stan::test::expect_ad(f, z1, v1);
+  stan::test::expect_ad(f, z1, rv1);
+  stan::test::expect_ad(f, z1, m1);
+  stan::test::expect_ad(f, v1, z2);
+  stan::test::expect_ad(f, v1, v2);
+  stan::test::expect_ad(f, rv1, z2);
+  stan::test::expect_ad(f, rv1, rv2);
+  stan::test::expect_ad(f, m1, z2);
+  stan::test::expect_ad(f, m1, m2);
+}

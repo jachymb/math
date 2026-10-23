@@ -154,3 +154,19 @@ TEST(mathMixCore, operatorAdditionMatrixLinearAccess) {
   EXPECT_MATRIX_FLOAT_EQ(A.adj(), expected_adj);
   stan::math::recover_memory();
 }
+
+TEST(mathMixCore, operatorAdditionComplexInt) {
+  // stanc3 emits z + n for complex z and int n as C++ infix under
+  // `using namespace stan::math`; std has no complex<double> + int
+  auto f = [](const auto& z) {
+    using stan::math::operator+;
+    return z + 3;
+  };
+  auto g = [](const auto& z) {
+    using stan::math::operator+;
+    return -2 + z;
+  };
+  std::complex<double> z(1.5, -0.5);
+  stan::test::expect_ad(f, z);
+  stan::test::expect_ad(g, z);
+}

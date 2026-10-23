@@ -63,3 +63,19 @@ TEST(mathMixCore, operatorDivisionVarMat) {
   stan::test::expect_ad_matvar(stan::test::operator_divide_tester{}, mat1, 2.0);
   stan::test::expect_ad_matvar(stan::test::operator_divide_tester{}, 2.0, mat2);
 }
+
+TEST(mathMixCore, operatorDivisionComplexInt) {
+  // stanc3 emits z / n for complex z and int n as C++ infix under
+  // `using namespace stan::math`; std has no complex<double> / int
+  auto f = [](const auto& z) {
+    using stan::math::operator/;
+    return z / 3;
+  };
+  auto g = [](const auto& z) {
+    using stan::math::operator/;
+    return -2 / z;
+  };
+  std::complex<double> z(1.5, -0.5);
+  stan::test::expect_ad(f, z);
+  stan::test::expect_ad(g, z);
+}

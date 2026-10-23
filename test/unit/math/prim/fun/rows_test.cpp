@@ -28,3 +28,12 @@ TEST(primMatFunRows, rowVector) {
   RowVectorXd u(1);
   EXPECT_EQ(1, rows(u));
 }
+TEST(primMatFunRows, complex) {
+  using stan::math::rows;
+  Eigen::VectorXcd v(3);
+  Eigen::RowVectorXcd rv(2);
+  Eigen::MatrixXcd m(2, 3);
+  EXPECT_EQ(3, rows(v));
+  EXPECT_EQ(1, rows(rv));
+  EXPECT_EQ(2, rows(m));
+}

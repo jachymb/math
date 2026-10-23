@@ -22,3 +22,17 @@ TEST(MathFunctions, logical_eq_nan) {
   EXPECT_FALSE(stan::math::logical_eq(nan, 2.0));
   EXPECT_FALSE(stan::math::logical_eq(nan, nan));
 }
+
+TEST(MathFunctions, logical_eq_complex) {
+  using c_t = std::complex<double>;
+  using stan::math::logical_eq;
+
+  EXPECT_TRUE(logical_eq(c_t(1.5, -2), c_t(1.5, -2)));
+  EXPECT_FALSE(logical_eq(c_t(1.5, -2), c_t(1.5, 2)));
+  EXPECT_FALSE(logical_eq(c_t(1.5, -2), c_t(-1.5, -2)));
+
+  EXPECT_TRUE(logical_eq(c_t(2, 0), 2.0));
+  EXPECT_FALSE(logical_eq(c_t(2, 1), 2.0));
+  EXPECT_TRUE(logical_eq(2.0, c_t(2, 0)));
+  EXPECT_FALSE(logical_eq(2.0, c_t(2, 1)));
+}

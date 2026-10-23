@@ -21,3 +21,17 @@ TEST(MathFunctions, logical_neq_nan) {
   EXPECT_TRUE(stan::math::logical_neq(nan, 2.0));
   EXPECT_TRUE(stan::math::logical_neq(nan, nan));
 }
+
+TEST(MathFunctions, logical_neq_complex) {
+  using c_t = std::complex<double>;
+  using stan::math::logical_neq;
+
+  EXPECT_FALSE(logical_neq(c_t(1.5, -2), c_t(1.5, -2)));
+  EXPECT_TRUE(logical_neq(c_t(1.5, -2), c_t(1.5, 2)));
+  EXPECT_TRUE(logical_neq(c_t(1.5, -2), c_t(-1.5, -2)));
+
+  EXPECT_FALSE(logical_neq(c_t(2, 0), 2.0));
+  EXPECT_TRUE(logical_neq(c_t(2, 1), 2.0));
+  EXPECT_FALSE(logical_neq(2.0, c_t(2, 0)));
+  EXPECT_TRUE(logical_neq(2.0, c_t(2, 1)));
+}

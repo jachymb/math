@@ -1,5 +1,4 @@
 #include <test/unit/math/test_ad.hpp>
-#include <iostream>
 
 inline void expect_diag_pre_multiply(const Eigen::VectorXd& v,
                                      const Eigen::MatrixXd& a) {
@@ -81,4 +80,20 @@ TEST(MathMixMatFun, diagPreMultiply) {
 
   // non-square error: mismatched sizes
   expect_diag_pre_multiply(u3d, b23);
+}
+
+TEST(MathMixMatFun, diagPreMultiplyComplex) {
+  using cd = std::complex<double>;
+  auto f = [](const auto& x, const auto& y) {
+    return stan::math::diag_pre_multiply(x, y);
+  };
+
+  Eigen::VectorXcd v(2);
+  v << cd(1, 2), cd(-0.5, 1.5);
+  Eigen::RowVectorXcd rv(2);
+  rv << cd(2, -1), cd(0.25, 0.75);
+  Eigen::MatrixXcd a(2, 3);
+  a << cd(1, -1), cd(0.5, 2), cd(-2, 1), cd(3, 0.25), cd(-1, -2), cd(2, 3);
+  stan::test::expect_ad(f, v, a);
+  stan::test::expect_ad(f, rv, a);
 }

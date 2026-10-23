@@ -9,3 +9,8 @@ TEST(MathMixMatFun, repRowVector) {
   stan::test::expect_ad(f(1), y);
   stan::test::expect_ad(f(4), y);
 }
+
+TEST(MathMixMatFun, repRowVectorComplex) {
+  auto f = [](const auto& y) { return stan::math::rep_row_vector(y, 3); };
+  stan::test::expect_ad(f, std::complex<double>(1.5, -2.1));
+}

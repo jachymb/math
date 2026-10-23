@@ -1,5 +1,4 @@
 #include <test/unit/math/test_ad.hpp>
-#include <limits>
 #include <vector>
 
 TEST(mathMixMatFun, dotProduct) {
@@ -120,4 +119,26 @@ TEST(mathMixMatFun, dotProduct) {
 
   // eliminated tests that matrix args throw in ad because
   // they don't compile in prim;  they shouldn't compile in ad, either
+}
+
+TEST(mathMixMatFun, dotProductComplex) {
+  using c_t = std::complex<double>;
+  auto f = [](const auto& x, const auto& y) {
+    return stan::math::dot_product(x, y);
+  };
+
+  Eigen::VectorXcd u(3);
+  u << c_t(1.5, -2.1), c_t(-3.2, 0.7), c_t(0.4, 2.9);
+  Eigen::VectorXcd v(3);
+  v << c_t(0.6, 1.3), c_t(2.2, -0.8), c_t(-1.1, -0.5);
+  Eigen::RowVectorXcd ru = u.transpose();
+  Eigen::RowVectorXcd rv = v.transpose();
+  std::vector<c_t> au{u(0), u(1), u(2)};
+  std::vector<c_t> av{v(0), v(1), v(2)};
+
+  stan::test::expect_ad(f, u, v);
+  stan::test::expect_ad(f, u, rv);
+  stan::test::expect_ad(f, ru, v);
+  stan::test::expect_ad(f, ru, rv);
+  stan::test::expect_ad(f, au, av);
 }

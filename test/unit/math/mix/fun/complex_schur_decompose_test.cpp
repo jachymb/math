@@ -113,3 +113,32 @@ TEST(mathMixFun, complexSchurDecomposeIdent) {
     test_complex_schur_decompose_complex<ffv_t>(x);
   }
 }
+
+TEST(mathMixFun, complexSchurDecomposeComplex) {
+  // U and T are unique only up to a phase per column of U, so test functions
+  // invariant to it: the reconstruction U * T * U^H, the diagonal of T (the
+  // eigenvalues), |T(0, 1)| and the moduli |U(i, j)|.
+  auto f_ut = [](const auto& x) {
+    auto ut = stan::math::complex_schur_decompose(x);
+    return (std::get<0>(ut) * std::get<1>(ut) * std::get<0>(ut).adjoint())
+        .eval();
+  };
+  auto f_t_diag = [](const auto& x) {
+    return stan::math::diagonal(stan::math::complex_schur_decompose_t(x))
+        .eval();
+  };
+  auto f_t_01 = [](const auto& x) {
+    return stan::math::abs(stan::math::complex_schur_decompose_t(x)(0, 1));
+  };
+  auto f_u = [](const auto& x) {
+    return stan::math::abs(stan::math::complex_schur_decompose_u(x)).eval();
+  };
+
+  using c_t = std::complex<double>;
+  Eigen::MatrixXcd x(2, 2);
+  x << c_t(1, 2), c_t(-0.5, 1), c_t(2, -1), c_t(-1.5, 0.5);
+  stan::test::expect_ad(f_ut, x);
+  stan::test::expect_ad(f_t_diag, x);
+  stan::test::expect_ad(f_t_01, x);
+  stan::test::expect_ad(f_u, x);
+}

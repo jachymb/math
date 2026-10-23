@@ -13,3 +13,8 @@ TEST(MathMixMatFun, repVector) {
   stan::test::expect_ad_matvar(f(1), y);
   stan::test::expect_ad_matvar(f(4), y);
 }
+
+TEST(MathMixMatFun, repVectorComplex) {
+  auto f = [](const auto& y) { return stan::math::rep_vector(y, 3); };
+  stan::test::expect_ad(f, std::complex<double>(1.5, -2.1));
+}

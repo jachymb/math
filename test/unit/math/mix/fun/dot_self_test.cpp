@@ -20,3 +20,15 @@ TEST(MathMixMatFun, dotSelf) {
     stan::test::expect_ad_matvar(f, a);
   }
 }
+
+TEST(MathMixMatFun, dotSelfComplex) {
+  using c_t = std::complex<double>;
+  auto f = [](const auto& y) { return stan::math::dot_self(y); };
+
+  Eigen::VectorXcd v(3);
+  v << c_t(1.5, -2.1), c_t(-3.2, 0.7), c_t(0.4, 2.9);
+  Eigen::RowVectorXcd rv = v.transpose();
+
+  stan::test::expect_ad(f, v);
+  stan::test::expect_ad(f, rv);
+}

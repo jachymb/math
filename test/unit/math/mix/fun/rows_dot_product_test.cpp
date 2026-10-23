@@ -67,3 +67,27 @@ TEST(MathMixMatFun, rowsDotProduct) {
   stan::test::expect_ad_matvar(f, em33, em23);
   stan::test::expect_ad_matvar(f, em23, em33);
 }
+
+TEST(MathMixMatFun, rowsDotProductComplex) {
+  using c_t = std::complex<double>;
+  auto f = [](const auto& x, const auto& y) {
+    return stan::math::rows_dot_product(x, y);
+  };
+
+  Eigen::VectorXcd u(3);
+  u << c_t(1.5, -2.1), c_t(-3.2, 0.7), c_t(0.4, 2.9);
+  Eigen::VectorXcd v(3);
+  v << c_t(0.6, 1.3), c_t(2.2, -0.8), c_t(-1.1, -0.5);
+  Eigen::RowVectorXcd ru = u.transpose();
+  Eigen::RowVectorXcd rv = v.transpose();
+  Eigen::MatrixXcd a(2, 3);
+  a << c_t(1.1, 0.3), c_t(-0.5, 1.2), c_t(0.8, -1.4), c_t(-1.3, -0.9),
+      c_t(0.6, 0.7), c_t(1.2, -0.4);
+  Eigen::MatrixXcd b(2, 3);
+  b << c_t(-0.7, 0.9), c_t(1.4, 0.2), c_t(-0.3, -1.1), c_t(0.5, 1.6),
+      c_t(2.1, -0.6), c_t(-1.2, 0.8);
+
+  stan::test::expect_ad(f, u, v);
+  stan::test::expect_ad(f, ru, rv);
+  stan::test::expect_ad(f, a, b);
+}

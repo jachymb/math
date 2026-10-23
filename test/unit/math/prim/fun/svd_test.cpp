@@ -1,7 +1,6 @@
 #include <stan/math/prim.hpp>
 #include <gtest/gtest.h>
 #include <test/unit/util.hpp>
-#include <stdexcept>
 #include <stan/math/prim/fun/Eigen.hpp>
 #include <complex>
 
@@ -105,4 +104,6 @@ TEST(MathMatrixPrimMat, svd) {
   vector_d c32_D_out;
   std::tie(c32_U_out, c32_D_out, c32_V_out) = svd(c32);
   EXPECT_MATRIX_COMPLEX_FLOAT_EQ(c32_U, c32_U_out);
+  EXPECT_MATRIX_FLOAT_EQ(c32_D, c32_D_out);
+  EXPECT_MATRIX_COMPLEX_NEAR(c32_V, c32_V_out, 1e-7);
 }

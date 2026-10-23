@@ -41,3 +41,30 @@ TEST(MathMatrixPrimArr, rep_array3D) {
   EXPECT_THROW(rep_array(2.0, 2, -3, 4), std::domain_error);
   EXPECT_THROW(rep_array(2.0, 2, 3, -4), std::domain_error);
 }
+TEST(MathMatrixPrimArr, rep_array_complex) {
+  using c_t = std::complex<double>;
+  using stan::math::rep_array;
+  using std::vector;
+  c_t z(1.5, -2.5);
+  vector<vector<vector<c_t> > > x = rep_array(z, 2, 3, 4);
+  EXPECT_EQ(2U, x.size());
+  for (const auto& x_i : x) {
+    EXPECT_EQ(3U, x_i.size());
+    for (const auto& x_ij : x_i) {
+      EXPECT_EQ(4U, x_ij.size());
+      for (const auto& x_ijk : x_ij) {
+        EXPECT_EQ(z, x_ijk);
+      }
+    }
+  }
+
+  Eigen::VectorXcd v(2);
+  v << c_t(1, 2), c_t(-3, 4);
+  vector<Eigen::VectorXcd> y = rep_array(v, 3);
+  EXPECT_EQ(3U, y.size());
+  for (const auto& y_i : y) {
+    ASSERT_EQ(2, y_i.size());
+    EXPECT_EQ(v(0), y_i(0));
+    EXPECT_EQ(v(1), y_i(1));
+  }
+}

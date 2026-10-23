@@ -5,8 +5,20 @@
 TEST(mathMixMatFun, conj) {
   auto f = [](const auto& x) { return stan::math::conj(x); };
   stan::test::expect_complex_common(f);
-  stan::test::expect_unary_vectorized<stan::test::ScalarSupport::ComplexOnly>(
-      f);
+  stan::test::expect_common_unary_vectorized<
+      stan::test::ScalarSupport::ComplexOnly>(f);
+
+  using c_t = std::complex<double>;
+  Eigen::VectorXcd v(3);
+  v << c_t{1.5, -0.7}, c_t{-2.1, 0.4}, c_t{0.3, 3.2};
+  Eigen::RowVectorXcd rv = v.transpose();
+  Eigen::MatrixXcd m(2, 3);
+  m << c_t{1.5, -0.7}, c_t{-2.1, 0.4}, c_t{0.3, 3.2}, c_t{-1.2, -0.9},
+      c_t{2.4, 1.1}, c_t{-0.6, 2.7};
+  stan::test::expect_ad(f, v);
+  stan::test::expect_ad(f, rv);
+  stan::test::expect_ad(f, m);
+  stan::test::expect_ad(f, std::vector<c_t>{v(0), v(1)});
 }
 
 template <typename T>

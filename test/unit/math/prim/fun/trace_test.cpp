@@ -12,3 +12,10 @@ TEST(MathMatrixPrimMat, trace) {
   m << 1, 2, 3, 4, 5, 6;
   EXPECT_FLOAT_EQ(6.0, trace(m));
 }
+
+TEST(MathMatrixPrimMat, traceComplex) {
+  using c_t = std::complex<double>;
+  Eigen::MatrixXcd m(2, 2);
+  m << c_t(1, 2), c_t(-3, 0.5), c_t(0.25, -1), c_t(2, -4);
+  EXPECT_EQ(c_t(3, -2), stan::math::trace(m));
+}

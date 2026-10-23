@@ -63,3 +63,23 @@ TEST(MathPrimFun, size_matrices) {
   v << 1, 2;
   EXPECT_EQ(2U, stan::math::size(v));
 }
+
+TEST(MathPrimFun, size_complex) {
+  using std::vector;
+  std::complex<double> z(1.5, -2.0);
+  EXPECT_EQ(1, stan::math::size(z));
+
+  Eigen::VectorXcd v(3);
+  Eigen::RowVectorXcd rv(2);
+  Eigen::MatrixXcd m(2, 3);
+  EXPECT_EQ(3, stan::math::size(v));
+  EXPECT_EQ(2, stan::math::size(rv));
+  EXPECT_EQ(6, stan::math::size(m));
+
+  EXPECT_EQ(4, stan::math::size(vector<std::complex<double> >(4, z)));
+  EXPECT_EQ(2, stan::math::size(vector<Eigen::VectorXcd>(2, v)));
+  EXPECT_EQ(3, stan::math::size(vector<Eigen::RowVectorXcd>(3, rv)));
+  EXPECT_EQ(2, stan::math::size(vector<Eigen::MatrixXcd>(2, m)));
+  EXPECT_EQ(3, stan::math::size(vector<vector<std::complex<double> > >(
+                   3, vector<std::complex<double> >(2, z))));
+}

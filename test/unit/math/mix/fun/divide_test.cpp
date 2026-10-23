@@ -79,3 +79,26 @@ TEST(MathMixMatFun, divide) {
     stan::test::expect_ad_matvar(f, p, value);
   }
 }
+
+TEST(MathMixMatFun, divideComplex) {
+  using c_t = std::complex<double>;
+  auto f
+      = [](const auto& x, const auto& y) { return stan::math::divide(x, y); };
+
+  c_t z1(1.5, -0.5);
+  c_t z2(-0.8, 1.2);
+  Eigen::VectorXcd v(2);
+  v << c_t(0.5, 1.2), c_t(-1.3, 0.4);
+  Eigen::RowVectorXcd rv(2);
+  rv << c_t(1.1, -0.6), c_t(-0.4, 2.2);
+  Eigen::MatrixXcd m(2, 2);
+  m << c_t(1, -0.5), c_t(0.25, 2), c_t(-1.5, 0.75), c_t(2.5, -1);
+
+  stan::test::expect_ad(f, z1, z2);
+  stan::test::expect_ad(f, z1, v);
+  stan::test::expect_ad(f, z1, rv);
+  stan::test::expect_ad(f, z1, m);
+  stan::test::expect_ad(f, v, z2);
+  stan::test::expect_ad(f, rv, z2);
+  stan::test::expect_ad(f, m, z2);
+}

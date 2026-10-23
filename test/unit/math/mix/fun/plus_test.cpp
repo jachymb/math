@@ -40,3 +40,8 @@ TEST(MathMixMatFun, plus) {
     stan::test::expect_ad(f, y);
   }
 }
+
+TEST(MathMixMatFun, plusComplex) {
+  auto f = [](const auto& x) { return stan::math::plus(x); };
+  stan::test::expect_ad(f, std::complex<double>(1.5, -0.5));
+}

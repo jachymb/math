@@ -1,4 +1,5 @@
 #include <stan/math/mix.hpp>
+#include <test/unit/math/test_ad.hpp>
 #include <gtest/gtest.h>
 #include <vector>
 #include <random>
@@ -381,4 +382,34 @@ TEST(MathFunctions, append_array_mix) {
   check<M, Mffv, Mffv>();
   check<Mffv, M, Mffv>();
   check<Mffv, Mffv, Mffv>();
+}
+
+TEST(MathFunctions, append_array_complex) {
+  using c_t = std::complex<double>;
+  auto f = [](const auto& x, const auto& y) {
+    return stan::math::append_array(x, y);
+  };
+
+  Eigen::VectorXcd v(2);
+  v << c_t(1.5, -2.1), c_t(-3.2, 0.7);
+  Eigen::RowVectorXcd rv(2);
+  rv << c_t(0.4, 2.9), c_t(-1.3, -0.6);
+  Eigen::MatrixXcd m(2, 2);
+  m << c_t(1.1, 0.3), c_t(-0.5, 2.2), c_t(0.8, -1.4), c_t(-2.6, -0.9);
+  std::vector<c_t> a{c_t(1.5, -2.1), c_t(-3.2, 0.7)};
+  std::vector<c_t> b{c_t(0.4, 2.9)};
+  std::vector<Eigen::VectorXcd> av{v, v.reverse()};
+  std::vector<Eigen::VectorXcd> bv{v.conjugate()};
+  std::vector<Eigen::RowVectorXcd> arv{rv, rv.reverse()};
+  std::vector<Eigen::RowVectorXcd> brv{rv.conjugate()};
+  std::vector<Eigen::MatrixXcd> am{m, m.transpose()};
+  std::vector<Eigen::MatrixXcd> bm{m.conjugate()};
+  std::vector<std::vector<c_t> > aa{a, {c_t(-0.7, 1.8), c_t(2.4, -0.3)}};
+  std::vector<std::vector<c_t> > ba{{c_t(0.6, 1.2), c_t(-1.7, -0.4)}};
+
+  stan::test::expect_ad(f, a, b);
+  stan::test::expect_ad(f, av, bv);
+  stan::test::expect_ad(f, arv, brv);
+  stan::test::expect_ad(f, am, bm);
+  stan::test::expect_ad(f, aa, ba);
 }

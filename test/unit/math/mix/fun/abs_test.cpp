@@ -261,3 +261,16 @@ TEST(mathMixMatFun, abs_varmat) {
   }
   expect_ad_vector_matvar(f, A);
 }
+
+TEST(mixFun, absComplexNested) {
+  auto f = [](const auto& x) { return stan::math::abs(x); };
+  using c_t = std::complex<double>;
+
+  // array[,] complex_vector
+  Eigen::VectorXcd v(2);
+  v << c_t{1.9, -1.8}, c_t{-0.7, 2.3};
+  Eigen::VectorXcd w(2);
+  w << c_t{0.4, 1.1}, c_t{-2.5, -0.6};
+  using avc_t = std::vector<Eigen::VectorXcd>;
+  stan::test::expect_ad(f, std::vector<avc_t>{avc_t{v, w}, avc_t{w, v}});
+}

@@ -70,3 +70,14 @@ TEST(MathFunctions, append_array_check_size_vector2) {
   }
   EXPECT_THROW(result = stan::math::append_array(x, y), std::invalid_argument);
 }
+
+TEST(MathFunctions, append_array_complex_values) {
+  using c_t = std::complex<double>;
+  std::vector<c_t> x{c_t(1, 2), c_t(-3, 4)};
+  std::vector<c_t> y{c_t(0.5, -1.5)};
+  std::vector<c_t> z = stan::math::append_array(x, y);
+  ASSERT_EQ(3U, z.size());
+  EXPECT_EQ(x[0], z[0]);
+  EXPECT_EQ(x[1], z[1]);
+  EXPECT_EQ(y[0], z[2]);
+}

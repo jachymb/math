@@ -338,3 +338,15 @@ TEST(ToMatrixRowVectorArray, empty) {
     EXPECT_MATRIX_FLOAT_EQ(zero_cols[i], round_trip[i]);
   }
 }
+
+TEST(ToMatrixArray, complexValues) {
+  using c_t = std::complex<double>;
+  using stan::math::to_matrix;
+  std::vector<c_t> a{c_t(1, -2), c_t(3, 4), c_t(-5, 6), c_t(7, -8)};
+  std::vector<std::vector<c_t>> aa{{a[0], a[1]}, {a[2], a[3]}};
+  Eigen::MatrixXcd row_major(2, 2);
+  row_major << a[0], a[1], a[2], a[3];  // comma initializer fills by rows
+  EXPECT_TRUE(row_major == to_matrix(a, 2, 2, 0));
+  EXPECT_TRUE(row_major == to_matrix(aa));
+  EXPECT_TRUE(row_major.transpose() == to_matrix(a, 2, 2));
+}

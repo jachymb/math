@@ -12,3 +12,12 @@ TEST(MathMixMatFun, diagMatrix) {
     stan::test::expect_ad(f, b);
   }
 }
+
+TEST(MathMixMatFun, diagMatrixComplex) {
+  using cd = std::complex<double>;
+  auto f = [](const auto& y) { return stan::math::diag_matrix(y); };
+
+  Eigen::VectorXcd a(3);
+  a << cd(1, 2), cd(-0.5, 1.5), cd(3, -1);
+  stan::test::expect_ad(f, a);
+}

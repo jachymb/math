@@ -46,3 +46,19 @@ TEST(MathMatrixPrimMat, cumulative_sum) {
   test_cumulative_sum<Eigen::Matrix<double, Eigen::Dynamic, 1> >();
   test_cumulative_sum<Eigen::Matrix<double, 1, Eigen::Dynamic> >();
 }
+
+TEST(MathMatrixPrimMat, cumulativeSumComplex) {
+  using c_t = std::complex<double>;
+  std::vector<c_t> a{c_t(1, 2), c_t(-3, 0.5), c_t(0.25, -1)};
+  std::vector<c_t> expected{c_t(1, 2), c_t(-2, 2.5), c_t(-1.75, 1.5)};
+  Eigen::VectorXcd v = Eigen::Map<Eigen::VectorXcd>(a.data(), 3);
+  Eigen::RowVectorXcd rv = v.transpose();
+  std::vector<c_t> ca = stan::math::cumulative_sum(a);
+  Eigen::VectorXcd cv = stan::math::cumulative_sum(v);
+  Eigen::RowVectorXcd crv = stan::math::cumulative_sum(rv);
+  for (int i = 0; i < 3; ++i) {
+    EXPECT_EQ(expected[i], ca[i]);
+    EXPECT_EQ(expected[i], cv(i));
+    EXPECT_EQ(expected[i], crv(i));
+  }
+}

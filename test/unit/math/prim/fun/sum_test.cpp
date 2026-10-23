@@ -3,7 +3,6 @@
 #include <gtest/gtest.h>
 #include <cmath>
 #include <limits>
-#include <type_traits>
 #include <vector>
 
 TEST(MathFunctions, sumZeroSize) {
@@ -102,4 +101,18 @@ TEST(MathMatrixPrimMat, sumIsTemplated) {
   EXPECT_SAME_TYPE(int, sum_return_t<Matrix<int, 2, 3>>);
   EXPECT_SAME_TYPE(double, sum_return_t<Matrix<double, 4, 2>>);
   EXPECT_SAME_TYPE(float, sum_return_t<std::vector<float>>);
+}
+
+TEST(MathMatrixPrimMat, sumComplex) {
+  using c_t = std::complex<double>;
+  // dyadic parts, so the sum is exact in any order
+  std::vector<c_t> a{c_t(1, 2), c_t(-3, 0.5), c_t(0.25, -1), c_t(2, -4)};
+  Eigen::VectorXcd v = Eigen::Map<Eigen::VectorXcd>(a.data(), 4);
+  Eigen::RowVectorXcd rv = v.transpose();
+  Eigen::MatrixXcd m = Eigen::Map<Eigen::MatrixXcd>(a.data(), 2, 2);
+  const c_t expected(0.25, -2.5);
+  EXPECT_EQ(expected, stan::math::sum(a));
+  EXPECT_EQ(expected, stan::math::sum(v));
+  EXPECT_EQ(expected, stan::math::sum(rv));
+  EXPECT_EQ(expected, stan::math::sum(m));
 }

@@ -139,3 +139,24 @@ TEST(MathMatrixPrimMat, num_elements) {
   vector<vector<Matrix<double, Dynamic, Dynamic> > > mixed14;
   EXPECT_EQ(num_elements(mixed14), 0);
 }
+
+TEST(MathMatrixPrimMat, num_elements_complex) {
+  using stan::math::num_elements;
+  using std::vector;
+  std::complex<double> z(1.5, -2.0);
+  Eigen::VectorXcd v(3);
+  Eigen::RowVectorXcd rv(2);
+  Eigen::MatrixXcd m(2, 3);
+  EXPECT_EQ(3, num_elements(v));
+  EXPECT_EQ(2, num_elements(rv));
+  EXPECT_EQ(6, num_elements(m));
+
+  EXPECT_EQ(4, num_elements(vector<std::complex<double> >(4, z)));
+  EXPECT_EQ(6, num_elements(vector<Eigen::VectorXcd>(2, v)));
+  EXPECT_EQ(6, num_elements(vector<Eigen::RowVectorXcd>(3, rv)));
+  EXPECT_EQ(12, num_elements(vector<Eigen::MatrixXcd>(2, m)));
+  EXPECT_EQ(6, num_elements(vector<vector<std::complex<double> > >(
+                   3, vector<std::complex<double> >(2, z))));
+  EXPECT_EQ(48, num_elements(vector<vector<Eigen::MatrixXcd> >(
+                    4, vector<Eigen::MatrixXcd>(2, m))));
+}

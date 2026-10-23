@@ -17,3 +17,12 @@ TEST(MathMixMatFun, block) {
   stan::test::expect_ad(f(0, 0, 1, 1), a);
   stan::test::expect_ad(f(0, 0, 4, 4), a);
 }
+
+TEST(MathMixMatFun, blockComplex) {
+  using c_t = std::complex<double>;
+  auto f = [](const auto& y) { return stan::math::block(y, 1, 2, 2, 2); };
+  Eigen::MatrixXcd m(2, 3);
+  m << c_t(1.5, -2.1), c_t(-3.2, 0.7), c_t(0.4, 2.9), c_t(2.2, 1.1),
+      c_t(-0.6, -1.8), c_t(3.3, -0.9);
+  stan::test::expect_ad(f, m);
+}

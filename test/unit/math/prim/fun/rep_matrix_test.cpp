@@ -64,3 +64,33 @@ TEST(MathMatrixPrimMat, rep_matrix_both_ways) {
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> x(3, 3);
   x = true ? rep_matrix(v, 3) : rep_matrix(rv, 3);
 }
+
+TEST(MathMatrixPrimMat, rep_matrix_complex) {
+  using c_t = std::complex<double>;
+  using stan::math::rep_matrix;
+  c_t z(1.5, -2.5);
+  Eigen::MatrixXcd x = rep_matrix(z, 2, 3);
+  EXPECT_EQ(2, x.rows());
+  EXPECT_EQ(3, x.cols());
+  for (int i = 0; i < x.rows(); ++i) {
+    for (int j = 0; j < x.cols(); ++j) {
+      EXPECT_EQ(z, x(i, j));
+    }
+  }
+
+  Eigen::VectorXcd v(2);
+  v << c_t(1, 2), c_t(-3, 4);
+  Eigen::MatrixXcd y = rep_matrix(v, 3);
+  EXPECT_EQ(2, y.rows());
+  EXPECT_EQ(3, y.cols());
+  Eigen::RowVectorXcd rv = v.transpose();
+  Eigen::MatrixXcd w = rep_matrix(rv, 3);
+  EXPECT_EQ(3, w.rows());
+  EXPECT_EQ(2, w.cols());
+  for (int i = 0; i < 2; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      EXPECT_EQ(v(i), y(i, j));
+      EXPECT_EQ(v(i), w(j, i));
+    }
+  }
+}

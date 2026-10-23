@@ -1,5 +1,4 @@
 #include <test/unit/math/test_ad.hpp>
-#include <test/unit/math/mix/fun/multiply_util.hpp>
 
 TEST(mathMix, complexMultiply) {
   auto f
@@ -47,4 +46,22 @@ TEST(mathMix, complexMultiply) {
   stan::test::expect_ad(f, d_mat, cd_vec);
   stan::test::expect_ad(f, cd_mat, d_vec);
   stan::test::expect_ad(f, cd_mat, cd_vec);
+}
+
+TEST(mathMix, complexMultiplyScalar) {
+  using cd = std::complex<double>;
+  auto f
+      = [](const auto& x, const auto& y) { return stan::math::multiply(x, y); };
+  cd z(1.5, -0.5);
+  cd w(-0.25, 2);
+  Eigen::VectorXcd v(2);
+  v << cd(1, 2), cd(-0.5, 1.5);
+  Eigen::RowVectorXcd rv(2);
+  rv << cd(2, -1), cd(0.25, 0.75);
+
+  stan::test::expect_ad(f, z, w);
+  stan::test::expect_ad(f, z, v);
+  stan::test::expect_ad(f, v, z);
+  stan::test::expect_ad(f, z, rv);
+  stan::test::expect_ad(f, rv, z);
 }

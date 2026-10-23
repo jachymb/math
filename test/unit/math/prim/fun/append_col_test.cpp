@@ -169,3 +169,39 @@ TEST(MathMatrixPrimMat, append_col_different_types) {
 
   EXPECT_NO_THROW(stan::math::append_col(m_d, m_i));
 }
+
+TEST(MathMatrixPrimMat, append_col_complex) {
+  using c_t = std::complex<double>;
+  using stan::math::append_col;
+  c_t z(1.5, -2.5);
+  Eigen::RowVectorXcd rv(2);
+  rv << c_t(1, 2), c_t(-3, 4);
+  Eigen::VectorXcd v1(2);
+  v1 << c_t(5, -6), c_t(7, 8);
+  Eigen::VectorXcd v2(2);
+  v2 << c_t(-9, 10), c_t(11, -12);
+
+  EXPECT_TYPE(Eigen::RowVectorXcd, append_col(z, rv));
+  EXPECT_TYPE(Eigen::RowVectorXcd, append_col(rv, z));
+  EXPECT_TYPE(Eigen::MatrixXcd, append_col(v1, v2));
+
+  Eigen::RowVectorXcd zrv = append_col(z, rv);
+  ASSERT_EQ(3, zrv.size());
+  EXPECT_EQ(z, zrv(0));
+  EXPECT_EQ(rv(0), zrv(1));
+  EXPECT_EQ(rv(1), zrv(2));
+
+  Eigen::RowVectorXcd rvz = append_col(rv, z);
+  ASSERT_EQ(3, rvz.size());
+  EXPECT_EQ(rv(0), rvz(0));
+  EXPECT_EQ(rv(1), rvz(1));
+  EXPECT_EQ(z, rvz(2));
+
+  Eigen::MatrixXcd m = append_col(v1, v2);
+  ASSERT_EQ(2, m.rows());
+  ASSERT_EQ(2, m.cols());
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(v1(i), m(i, 0));
+    EXPECT_EQ(v2(i), m(i, 1));
+  }
+}

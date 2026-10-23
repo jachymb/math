@@ -39,3 +39,26 @@ TEST(mathMixMatFun, get_real_vectorized) {
   test_vectorized_get_real<
       stan::math::fvar<stan::math::fvar<stan::math::var>>>();
 }
+
+TEST(mathMixMatFun, get_real_containers) {
+  auto f = [](const auto& z) { return stan::math::get_real(z); };
+  using c_t = std::complex<double>;
+  Eigen::VectorXcd v(3);
+  v << c_t{1.5, -0.7}, c_t{-2.1, 0.4}, c_t{0.3, 3.2};
+  Eigen::RowVectorXcd rv(3);
+  rv << c_t{-1.2, -0.9}, c_t{2.4, 1.1}, c_t{-0.6, 2.7};
+  Eigen::MatrixXcd m(2, 3);
+  m << c_t{1.5, -0.7}, c_t{-2.1, 0.4}, c_t{0.3, 3.2}, c_t{-1.2, -0.9},
+      c_t{2.4, 1.1}, c_t{-0.6, 2.7};
+  std::vector<c_t> a{c_t{1.5, -0.7}, c_t{-2.1, 0.4}};
+  std::vector<c_t> b{c_t{0.3, 3.2}, c_t{-1.2, -0.9}};
+
+  stan::test::expect_ad(f, v);
+  stan::test::expect_ad(f, rv);
+  stan::test::expect_ad(f, m);
+  stan::test::expect_ad(f, a);
+  stan::test::expect_ad(f, std::vector<Eigen::VectorXcd>{v, v});
+  stan::test::expect_ad(f, std::vector<Eigen::RowVectorXcd>{rv, rv});
+  stan::test::expect_ad(f, std::vector<Eigen::MatrixXcd>{m, m});
+  stan::test::expect_ad(f, std::vector<std::vector<c_t>>{a, b});
+}
