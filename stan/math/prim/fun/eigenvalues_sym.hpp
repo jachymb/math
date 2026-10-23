@@ -9,14 +9,16 @@ namespace stan {
 namespace math {
 
 /**
- * Return the eigenvalues of the specified symmetric matrix
- * in ascending order of magnitude.  This function is more
- * efficient than the general eigenvalues function for symmetric
- * matrices.
+ * Return the eigenvalues of the specified symmetric (Hermitian for complex
+ * matrices) matrix in ascending order.  This function is more efficient
+ * than the general eigenvalues function for these matrices.
  *
  * @tparam EigMat type of the matrix
  * @param m Specified matrix.
  * @return Eigenvalues of matrix.
+ * @throw std::invalid_argument if m is not square and has nonzero size
+ * @throw std::domain_error if m is not symmetric (Hermitian for complex
+ * matrices)
  */
 template <typename EigMat, require_eigen_matrix_dynamic_t<EigMat>* = nullptr,
           require_not_st_var<EigMat>* = nullptr>

@@ -9,14 +9,18 @@ namespace stan {
 namespace math {
 
 /**
- * Return the eigendecomposition of the specified symmetric matrix.
+ * Return the eigendecomposition of the specified symmetric (Hermitian for
+ * complex matrices) matrix.
  *
  * @tparam EigMat type of the matrix
  * @param m Specified matrix.
  * @return A tuple V,D where V is a matrix where the columns are the
  * eigenvectors of m, and D is a column vector of the eigenvalues of m.
- * The eigenvalues are in ascending order of magnitude, with the eigenvectors
- * provided in the same order.
+ * The eigenvalues are in ascending order, with the eigenvectors provided in
+ * the same order.
+ * @throw std::invalid_argument if m is not square and has nonzero size
+ * @throw std::domain_error if m is not symmetric (Hermitian for complex
+ * matrices)
  */
 template <typename EigMat, require_eigen_t<EigMat>* = nullptr,
           require_not_st_var<EigMat>* = nullptr>

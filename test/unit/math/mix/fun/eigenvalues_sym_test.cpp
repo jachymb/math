@@ -86,3 +86,30 @@ TEST(MathMixMatFun, eigenvaluesSymComplex) {
   a33 << 1, 2, 3, 2, 5, 7.9, 3, 7.9, 1.08;
   stan::test::expect_ad(tols, f, a33);
 }
+
+TEST(MathMixMatFun, eigenvaluesSymHermitian) {
+  // Hermitian input with non-real off-diagonal entries, built from the lower
+  // triangle and the real part of the diagonal so that finite differences
+  // stay Hermitian
+  auto f = [](const auto& y) {
+    auto a = y.eval();
+    for (Eigen::Index j = 0; j < a.cols(); ++j) {
+      a(j, j) = a(j, j).real();
+      for (Eigen::Index i = 0; i < j; ++i) {
+        a(i, j) = stan::math::conj(a(j, i));
+      }
+    }
+    return stan::math::eigenvalues_sym(a);
+  };
+
+  using c = std::complex<double>;
+  Eigen::MatrixXcd y(3, 3);
+  y << c(1, 0), c(0, 0), c(0, 0), c(2, 1), c(5, 0), c(0, 0), c(3, -0.5),
+      c(7.9, 1.5), c(1.08, 0);
+  EXPECT_NO_THROW(f(y));
+
+  stan::test::ad_tolerances tols;
+  tols.hessian_hessian_ = 5e-2;
+  tols.hessian_fvar_hessian_ = 5e-2;
+  stan::test::expect_ad(tols, f, y);
+}

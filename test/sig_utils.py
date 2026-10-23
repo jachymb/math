@@ -87,6 +87,10 @@ special_arg_values = {
     "csr_matrix_times_vector": [1, 1, None, [1], [1, 2], None],
     "distance": [0.6, 0.4],
     "dirichlet_lpdf": [simplex, None],
+    # a real fill keeps complex input Hermitian (real diagonal)
+    "eigendecompose_sym": [0.4],
+    "eigenvalues_sym": [0.4],
+    "eigenvectors_sym": [0.4],
     "hmm_hidden_state_prob": [None, simplex, simplex],
     "hmm_latent_rng": [None, simplex, simplex, None],
     "hmm_marginal": [None, simplex, simplex],

@@ -66,12 +66,26 @@ TEST(ErrorHandlingMatrix, checkSymmetric_non_square) {
 }
 
 TEST(ErrorHandlingMatrix, checkSymmetric_complex) {
+  // complex matrices must be Hermitian
   Eigen::MatrixXcd y(2, 2);
-  y << std::complex<double>(1, 1), std::complex<double>(2, 2),
-      std::complex<double>(2, 2), std::complex<double>(1, 1);
+  y << std::complex<double>(1, 0), std::complex<double>(2, 2),
+      std::complex<double>(2, -2), std::complex<double>(1, 0);
 
   EXPECT_NO_THROW(stan::math::check_symmetric("checkSymmetric", "y", y));
   y(0, 1) = std::complex<double>(2, 3);
   EXPECT_THROW(stan::math::check_symmetric("checkSymmetric", "y", y),
+               std::domain_error);
+}
+
+TEST(ErrorHandlingMatrix, checkSymmetric_complex_not_hermitian) {
+  using c = std::complex<double>;
+  Eigen::MatrixXcd sym(2, 2);
+  sym << c(1, 0), c(2, 2), c(2, 2), c(1, 0);
+  EXPECT_THROW(stan::math::check_symmetric("checkSymmetric", "y", sym),
+               std::domain_error);
+
+  Eigen::MatrixXcd diag(1, 1);
+  diag << c(1, 1);
+  EXPECT_THROW(stan::math::check_symmetric("checkSymmetric", "y", diag),
                std::domain_error);
 }
