@@ -3,7 +3,6 @@
 
 #include <stan/math/rev/meta.hpp>
 #include <stan/math/rev/core.hpp>
-#include <stan/math/rev/fun/log.hpp>
 #include <stan/math/rev/fun/elt_multiply.hpp>
 #include <stan/math/prim/fun/lmultiply.hpp>
 #include <cmath>
@@ -16,10 +15,19 @@ class lmultiply_vv_vari : public op_vv_vari {
  public:
   lmultiply_vv_vari(vari* avi, vari* bvi)
       : op_vv_vari(lmultiply(avi->val_, bvi->val_), avi, bvi) {}
+  // A result with adjoint 0 contributes nothing to either operand: at b == 0
+  // the products 0 * log(0) and 0 * a / 0 would be NaN, which poisons every
+  // second derivative taken through this node (its value node has adjoint 0
+  // in an fvar<var> sweep).
   void chain() {
     using std::log;
+    if (adj_ == 0.0) {
+      return;
+    }
     avi_->adj_ += adj_ * log(bvi_->val_);
-    bvi_->adj_ += adj_ * avi_->val_ / bvi_->val_;
+    if (avi_->val_ != 0.0) {
+      bvi_->adj_ += adj_ * avi_->val_ / bvi_->val_;
+    }
   }
 };
 class lmultiply_vd_vari : public op_vd_vari {
@@ -28,14 +36,20 @@ class lmultiply_vd_vari : public op_vd_vari {
       : op_vd_vari(lmultiply(avi->val_, b), avi, b) {}
   void chain() {
     using std::log;
-    avi_->adj_ += adj_ * log(bd_);
+    if (adj_ != 0.0) {
+      avi_->adj_ += adj_ * log(bd_);
+    }
   }
 };
 class lmultiply_dv_vari : public op_dv_vari {
  public:
   lmultiply_dv_vari(double a, vari* bvi)
       : op_dv_vari(lmultiply(a, bvi->val_), a, bvi) {}
-  void chain() { bvi_->adj_ += adj_ * ad_ / bvi_->val_; }
+  void chain() {
+    if (adj_ != 0.0 && ad_ != 0.0) {
+      bvi_->adj_ += adj_ * ad_ / bvi_->val_;
+    }
+  }
 };
 }  // namespace internal
 
@@ -44,7 +58,8 @@ class lmultiply_dv_vari : public op_dv_vari {
  *
  * When both a and b are 0, the value returned is 0.
  * The partial derivative with respect to a is log(b).
- * The partial derivative with respect to b is a/b.
+ * The partial derivative with respect to b is a/b, or 0 when a is 0.
+ * A result with adjoint 0 contributes nothing to either argument.
  *
  * @param a First variable.
  * @param b Second variable.
@@ -70,16 +85,13 @@ inline var lmultiply(const var& a, double b) {
  * Return the value of a*log(b).
  *
  * When both a and b are 0, the value returned is 0.
- * The partial derivative with respect to b is a/b.
+ * The partial derivative with respect to b is a/b, or 0 when a is 0.
  *
  * @param a First scalar.
  * @param b Second variable.
  * @return Value of a*log(b)
  */
 inline var lmultiply(double a, const var& b) {
-  if (a == 1.0) {
-    return log(b);
-  }
   return var(new internal::lmultiply_dv_vari(a, b.vi_));
 }
 
@@ -107,30 +119,37 @@ inline auto lmultiply(const T1& a, const T2& b) {
         lmultiply(arena_a.val(), arena_b.val()),
         [arena_a, arena_b](const auto& res) mutable {
           arena_a.adj().array()
-              += res.adj().array() * arena_b.val().array().log();
-          arena_b.adj().array() += res.adj().array() * arena_a.val().array()
-                                   / arena_b.val().array();
+              += (res.adj().array() == 0.0)
+                     .select(0.0,
+                             res.adj().array() * arena_b.val().array().log());
+          arena_b.adj().array()
+              += (res.adj().array() == 0.0 || arena_a.val().array() == 0.0)
+                     .select(0.0, res.adj().array() * arena_a.val().array()
+                                      / arena_b.val().array());
         });
   } else if constexpr (is_autodiff_v<T1>) {
     arena_t<promote_scalar_t<var, T1>> arena_a = a;
     arena_t<promote_scalar_t<double, T2>> arena_b = value_of(b);
 
-    return make_callback_var(lmultiply(arena_a.val(), arena_b),
-                             [arena_a, arena_b](const auto& res) mutable {
-                               arena_a.adj().array()
-                                   += res.adj().array()
-                                      * arena_b.val().array().log();
-                             });
+    return make_callback_var(
+        lmultiply(arena_a.val(), arena_b),
+        [arena_a, arena_b](const auto& res) mutable {
+          arena_a.adj().array()
+              += (res.adj().array() == 0.0)
+                     .select(0.0, res.adj().array() * arena_b.array().log());
+        });
   } else {
     arena_t<promote_scalar_t<double, T1>> arena_a = value_of(a);
     arena_t<promote_scalar_t<var, T2>> arena_b = b;
 
-    return make_callback_var(lmultiply(arena_a, arena_b.val()),
-                             [arena_a, arena_b](const auto& res) mutable {
-                               arena_b.adj().array() += res.adj().array()
-                                                        * arena_a.val().array()
-                                                        / arena_b.val().array();
-                             });
+    return make_callback_var(
+        lmultiply(arena_a, arena_b.val()),
+        [arena_a, arena_b](const auto& res) mutable {
+          arena_b.adj().array()
+              += (res.adj().array() == 0.0 || arena_a.array() == 0.0)
+                     .select(0.0, res.adj().array() * arena_a.array()
+                                      / arena_b.val().array());
+        });
   }
 }
 
@@ -148,34 +167,31 @@ template <typename T1, typename T2, require_var_matrix_t<T1>* = nullptr,
 inline auto lmultiply(const T1& a, const T2& b) {
   using std::log;
 
-  if constexpr (is_autodiff_v<T1> && is_autodiff_v<T2>) {
+  if constexpr (is_autodiff_v<T2>) {
     arena_t<promote_scalar_t<var, T1>> arena_a = a;
     var arena_b = b;
 
     return make_callback_var(
         lmultiply(arena_a.val(), arena_b.val()),
         [arena_a, arena_b](const auto& res) mutable {
-          arena_a.adj().array() += res.adj().array() * log(arena_b.val());
-          arena_b.adj() += (res.adj().array() * arena_a.val().array()).sum()
-                           / arena_b.val();
+          arena_a.adj().array()
+              += (res.adj().array() == 0.0)
+                     .select(0.0, res.adj().array() * log(arena_b.val()));
+          if ((res.adj().array() != 0.0 && arena_a.val().array() != 0.0)
+                  .any()) {
+            arena_b.adj() += (res.adj().array() * arena_a.val().array()).sum()
+                             / arena_b.val();
+          }
         });
-  } else if constexpr (is_autodiff_v<T1>) {
+  } else {
     arena_t<promote_scalar_t<var, T1>> arena_a = a;
 
-    return make_callback_var(lmultiply(arena_a.val(), value_of(b)),
-                             [arena_a, b](const auto& res) mutable {
-                               arena_a.adj().array()
-                                   += res.adj().array() * log(value_of(b));
-                             });
-  } else {
-    arena_t<promote_scalar_t<double, T1>> arena_a = value_of(a);
-    var arena_b = b;
-
     return make_callback_var(
-        lmultiply(arena_a, arena_b.val()),
-        [arena_a, arena_b](const auto& res) mutable {
-          arena_b.adj()
-              += (res.adj().array() * arena_a.array()).sum() / arena_b.val();
+        lmultiply(arena_a.val(), value_of(b)),
+        [arena_a, b](const auto& res) mutable {
+          arena_a.adj().array()
+              += (res.adj().array() == 0.0)
+                     .select(0.0, res.adj().array() * log(value_of(b)));
         });
   }
 }
@@ -192,37 +208,37 @@ inline auto lmultiply(const T1& a, const T2& b) {
 template <typename T1, typename T2, require_stan_scalar_t<T1>* = nullptr,
           require_var_matrix_t<T2>* = nullptr>
 inline auto lmultiply(const T1& a, const T2& b) {
-  if constexpr (is_autodiff_v<T1> && is_autodiff_v<T2>) {
+  if constexpr (is_autodiff_v<T1>) {
     var arena_a = a;
     arena_t<promote_scalar_t<var, T2>> arena_b = b;
 
     return make_callback_var(
         lmultiply(arena_a.val(), arena_b.val()),
         [arena_a, arena_b](const auto& res) mutable {
-          arena_a.adj()
-              += (res.adj().array() * arena_b.val().array().log()).sum();
-          arena_b.adj().array()
-              += arena_a.val() * res.adj().array() / arena_b.val().array();
-        });
-  } else if constexpr (is_autodiff_v<T1>) {
-    var arena_a = a;
-    arena_t<promote_scalar_t<double, T2>> arena_b = value_of(b);
-
-    return make_callback_var(
-        lmultiply(arena_a.val(), arena_b),
-        [arena_a, arena_b](const auto& res) mutable {
-          arena_a.adj()
-              += (res.adj().array() * arena_b.val().array().log()).sum();
+          arena_a.adj() += (res.adj().array() == 0.0)
+                               .select(0.0, res.adj().array()
+                                                * arena_b.val().array().log())
+                               .sum();
+          if (arena_a.val() != 0.0) {
+            arena_b.adj().array()
+                += (res.adj().array() == 0.0)
+                       .select(0.0, arena_a.val() * res.adj().array()
+                                        / arena_b.val().array());
+          }
         });
   } else {
     arena_t<promote_scalar_t<var, T2>> arena_b = b;
 
-    return make_callback_var(lmultiply(value_of(a), arena_b.val()),
-                             [a, arena_b](const auto& res) mutable {
-                               arena_b.adj().array() += value_of(a)
-                                                        * res.adj().array()
-                                                        / arena_b.val().array();
-                             });
+    return make_callback_var(
+        lmultiply(value_of(a), arena_b.val()),
+        [a, arena_b](const auto& res) mutable {
+          if (value_of(a) != 0.0) {
+            arena_b.adj().array()
+                += (res.adj().array() == 0.0)
+                       .select(0.0, value_of(a) * res.adj().array()
+                                        / arena_b.val().array());
+          }
+        });
   }
 }
 

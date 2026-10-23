@@ -2,7 +2,6 @@
 #define STAN_MATH_PRIM_FUN_LMULTIPLY_HPP
 
 #include <stan/math/prim/meta.hpp>
-#include <stan/math/prim/fun/log.hpp>
 #include <stan/math/prim/functor/apply_scalar_binary.hpp>
 #include <cmath>
 
@@ -11,9 +10,23 @@ namespace math {
 
 /**
  * Return the first argument times the log of the second argument. The
- * result is 0 if both arguments are 0.  The funcgtion is defined by
+ * result is 0 if both arguments are 0.  The function is defined by
  * `lmultiply(x, y) = x * log(y)` if `x` or `y` is non-zero and
  * `lmultiply(0, 0) = 0` otherwise.
+ *
+ * The autodiff overloads take the partial with respect to `y` as `x / y`,
+ * or 0 when `x` is 0: `lmultiply(0, y)` is identically 0, and 0 is the
+ * limit of `x / y` as `x` goes to 0 at any fixed `y > 0`. For `x != 0`
+ * and `y = 0` the partial stays `x / 0`, infinite with the sign of `x`.
+ * At `x = y = 0` the reverse-mode partials are therefore `log(0) = -inf`
+ * and 0, and the derivative of `lmultiply(x, x)` is `-inf`, the limit of
+ * `log(x) + 1` as `x` goes to 0 from above, rather than NaN. In reverse
+ * mode a result with adjoint 0 likewise contributes nothing to either
+ * argument, rather than `0 * log(0)` or `0 * x / 0`; this makes the second
+ * derivative of `lmultiply(x, x)` at 0 through `fvar<var>` `+inf`, the
+ * limit of `1 / x`. (An `fvar` first argument with zero tangent still gives
+ * `0 * log(0) = NaN` there, so the second derivative with respect to `y`
+ * twice at `x = y = 0` stays NaN.)
  *
  * @tparam T1 type of the first argument
  * @tparam T2 type of the second argument

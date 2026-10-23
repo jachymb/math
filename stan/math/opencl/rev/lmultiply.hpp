@@ -5,7 +5,6 @@
 #include <stan/math/opencl/rev/adjoint_results.hpp>
 #include <stan/math/opencl/kernel_generator.hpp>
 #include <stan/math/rev/core.hpp>
-#include <stan/math/rev/fun/adjoint_of.hpp>
 #include <stan/math/rev/fun/value_of.hpp>
 
 namespace stan {
@@ -33,9 +32,13 @@ inline var_value<matrix_cl<double>> lmultiply(T_a&& a, T_b&& b) {
       lmultiply(value_of(a_arena), value_of(b_arena)),
       [a_arena, b_arena](const vari_value<matrix_cl<double>>& res) mutable {
         adjoint_results(a_arena, b_arena) += expressions(
-            elt_multiply(res.adj(), log(value_of(b_arena))),
-            elt_multiply(res.adj(),
-                         elt_divide(value_of(a_arena), value_of(b_arena))));
+            select(res.adj() == 0.0, 0.0,
+                   elt_multiply(res.adj(), log(value_of(b_arena)))),
+            elt_multiply(
+                res.adj(),
+                select(as_operation_cl(value_of(a_arena)) == 0.0
+                           || res.adj() == 0.0,
+                       0.0, elt_divide(value_of(a_arena), value_of(b_arena)))));
       });
 }
 
