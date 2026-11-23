@@ -174,6 +174,7 @@
 #include <stan/math/opencl/prim/inv_cloglog.hpp>
 #include <stan/math/opencl/prim/inv_gamma_lpdf.hpp>
 #include <stan/math/opencl/prim/inv_sqrt.hpp>
+#include <stan/math/opencl/prim/kronecker.hpp>
 #include <stan/math/opencl/prim/log_mix.hpp>
 #include <stan/math/opencl/prim/log_softmax.hpp>
 #include <stan/math/opencl/prim/logistic_cdf.hpp>

@@ -61,6 +61,7 @@
 #include <stan/math/opencl/rev/inv_Phi.hpp>
 #include <stan/math/opencl/rev/inv_sqrt.hpp>
 #include <stan/math/opencl/rev/inv_square.hpp>
+#include <stan/math/opencl/rev/kronecker.hpp>
 #include <stan/math/opencl/rev/lbeta.hpp>
 #include <stan/math/opencl/rev/ldexp.hpp>
 #include <stan/math/opencl/rev/lgamma.hpp>
